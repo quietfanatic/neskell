@@ -5,14 +5,14 @@ import ASM
 import ASM6502
 
  -- Provides an ines header.
- --       mapper   prgs     chrs
+ --       prgs     chrs     mapper
 header :: Word8 -> Word8 -> Word8 -> ASM ()
-header mapper prgs chrs = do
+header prgs chrs mapper = do
     ascii "NES"
     byte 0x1a
-    byte mapper
     byte prgs
     byte chrs
+    byte mapper
     fill 9 0
 
  -- The names of various memory-mapped ports
