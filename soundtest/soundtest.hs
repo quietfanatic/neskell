@@ -9,15 +9,11 @@ import NES
 main = B.putStr (assemble_asm top)
 
 top = mdo
-    NES.header 0x01 0x01 0x01
-    prgbank0
-    prgbank1
+    NES.header 0x01 0x01 0x00
+    prgbank
     chrbank
 
 chrbank = fill 0x2000 0xff
-
-prgbank0 = fill 0x2000 0xff
-
 
  -- bits representing the buttons
 button_a = 0x80
@@ -128,8 +124,8 @@ initialize = mdo
         bit ppu_status
 
 
-prgbank1 = mdo
-    set_counter 0xe000
+prgbank = mdo
+    set_counter 0xc000
     bank_begin <- here
     reset <- here
 
@@ -230,7 +226,7 @@ prgbank1 = mdo
 
     let irq = 0
     bank_end <- here
-    fill (0x2000 - 6 - (bank_end - bank_begin)) 0xff
+    fill (0x4000 - 6 - (bank_end - bank_begin)) 0xff
 
      -- the interrupt vector must be at the end of the bank.
     sequence$ map (le16 . fromIntegral) [nmi, reset, irq]
