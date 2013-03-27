@@ -52,7 +52,7 @@ rel8 b x = byte b >> Assembly f where
 
 
 adci :: (Integral a, Show a) => a -> ASM ()
-adci = op8 0x68
+adci = op8 0x69
 adcz :: (Integral a, Show a) => a -> ASM ()
 adcz = op8 0x65
 adcm :: (Integral a, Show a) => a -> ASM ()

@@ -50,17 +50,18 @@ sprites_left = 0x0f
  -- That's original, right?
 
 ball_x = 0x10
-ball_y = 0x10
+ball_y = 0x11
 
 init_ball = mdo
-    0x80 ->* ball_x
-    0x80 ->* ball_y
+    ldai 0x80
+    sta ball_x
+    sta ball_y
 
 move_ball = mdo
     let dir bit result = mdo
         lda input1
         andi bit
-        skip bne result
+        skip beq result
     dir button_left (dec ball_x)
     dir button_right (inc ball_x)
     dir button_up (dec ball_y)
@@ -70,12 +71,12 @@ draw_ball = do
     let part yexpr tile attr xexpr = mdo
             lda ball_y
             yexpr
-            sta ppu_mem
-            tile ->* ppu_mem
-            attr ->* ppu_mem
+            sta spr_mem
+            tile ->* spr_mem
+            attr ->* spr_mem
             lda ball_x
             xexpr
-            sta ppu_mem
+            sta spr_mem
             dec sprites_left
         add8 = clc >> adci 0x08
     part nothing 0x05 0x01 nothing
@@ -173,6 +174,8 @@ prg_main = mdo
          -- enable rendering
         0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
         0x1e ->* ppu_mask  -- 00011110
+        
+        init_ball
         jmp idle
 
     nmi <- startof$ mdo
