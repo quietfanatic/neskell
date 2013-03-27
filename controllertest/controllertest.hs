@@ -97,21 +97,34 @@ prg_main = mdo
         repfor (ldyi 0x20) bne dey $ mdo
             lday sprite_palettes
             sta ppu_mem
-         -- enable rendering
-        0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
-        0x1e ->* ppu_mask  -- 00011110
          -- Draw background
         lda ppu_status
         0x20 ->* ppu_address
         0x00 ->* ppu_address
          -- name table
-        repfor (ldyi 0x0f) bne dey $ mdo
-            repfor (ldxi 0x40) bne dex $ mdo
+        let row = 0x00
+        repfor (0x0f ->* row) bne (dec row) $ mdo
+             -- top row
+            repfor (ldxi 0x0) bne (inx >> cpxi 0x10) $ mdo
+                ldyxm background
+                lday tiles_tl
+                sta ppu_mem
+                lday tiles_tr
+                sta ppu_mem
+             -- bottom row
+            repfor (ldxi 0x0) bne (inx >> cpxi 0x10) $ mdo
+                ldyxm background
+                lday tiles_bl
+                sta ppu_mem
+                lday tiles_br
                 sta ppu_mem
          -- attribute table
         lda 0xAA
         repfor (ldyi 0x40) bne dey $ mdo
             sta ppu_mem
+         -- enable rendering
+        0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
+        0x1e ->* ppu_mask  -- 00011110
         jmp idle
 
     nmi <- startof$ mdo
@@ -146,10 +159,11 @@ prg_main = mdo
             sta spr_mem
             dec sprite_count
          -- Set the bg scroll
+        lda ppu_status
         ldai 0x00
         sta ppu_scroll
         sta ppu_scroll
-        jmp idle
+        rti
 
     sprite_palettes <- startof$ hexdata$ ""
         ++ "2212020f"
@@ -171,6 +185,32 @@ prg_main = mdo
         "01 01 00 00 03 03 02 02"
     btnspr_attr <- startof$ hexdata$
         "40 00 80 00 00 00 01 01"
+
+    tiles_tl <- startof$ hexdata$
+        "00 01 02 01 04 06 06"
+    tiles_tr <- startof$ hexdata$
+        "00 01 01 03 06 05 06"
+    tiles_bl <- startof$ hexdata$
+        "00 06 04 06 04 06 06"
+    tiles_br <- startof$ hexdata$
+        "00 06 06 05 06 05 06"
+
+    background <- startof$ hexdata$ ""
+        ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 02 01 01 03 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 04 06 06 05 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 04 06 06 05 00 00"
+        ++ "00 00 00 00 00 00 00 00 00 00 04 06 06 05 00 00"
+        ++ "00 00 02 01 01 01 03 00 00 00 04 06 06 05 00 00"
+        ++ "00 00 04 06 06 06 05 00 00 00 04 06 06 05 00 00"
+        ++ "01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01"
+        ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
+        ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
 
     return (nmi, reset, 0)
 
