@@ -456,3 +456,9 @@ txs = byte 0x9a
 
 tya = byte 0x98
 
+
+infix 2 ->*
+infix 2 *->*
+val ->* mem = ldai val >> sta mem
+a *->* b = lda a >> sta b
+

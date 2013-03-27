@@ -1,10 +1,14 @@
 
+{-# LANGUAGE RecursiveDo #-}
+
 module ASM (
     ASM,
     byte, bytes, ascii, fill, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
-    assemble_asm, no_overflow
+    assemble_asm, no_overflow,
+    startof, endof, sizeof,
+    rep, repfor, skip,
 ) where
 
 import Data.Word
@@ -100,3 +104,40 @@ no_overflow' min max x = let
 
 no_overflow :: (Integral a, Integral b, Bounded b) => a -> Maybe b
 no_overflow = no_overflow' minBound maxBound
+
+
+startof x = do
+    start <- here
+    x
+    return start
+
+endof x = x >> here
+
+sizeof x = do
+    start <- here
+    x
+    end <- here
+    return (end - start)
+
+
+rep :: (Int -> ASM ()) -> ASM () -> ASM ()
+rep branch code = mdo
+    start <- here
+    code
+    branch start
+
+repfor :: ASM () -> (Int -> ASM ()) -> ASM () -> ASM () -> ASM ()
+repfor init branch inc code = mdo
+    init
+    start <- here
+    code
+    inc
+    branch start
+
+skip :: (Int -> ASM ()) -> ASM () -> ASM ()
+skip branch code = mdo
+    branch end
+    code
+    end <- here
+    nothing
+
