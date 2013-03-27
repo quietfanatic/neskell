@@ -27,6 +27,16 @@ prgbank = mdo
 chrbank :: String -> ASM ()
 chrbank = pad 0x1000 0xff . binfile
 
+ -- Some utility pseudoops
+addi x = clc >> adci x
+addz x = clc >> adcz x
+addm x = clc >> adcm x
+add x = clc >> adc x
+subi x = sec >> sbci x
+subz x = sec >> sbcz x
+subm x = sec >> sbcm x
+sub x = sec >> sbc x
+
 
 btn_bits = 1 : map (shiftL 1) btn_bits
 [btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] = take 8 btn_bits
@@ -44,38 +54,50 @@ sprites_left = 0x0f
 ball_x = 0x10
 ball_xscreen = 0x11
 ball_y = 0x12
-bg_x = 0x13
-bg_xscreen = 0x14
-bg_y = 0x15
+camera_x = 0x13
+camera_xscreen = 0x14
+camera_y = 0x15
+ball_screen_x = 0x16
+ball_screen_y = 0x17
 
 init_ball = mdo
     ldai 0x80
     sta ball_x
     sta ball_y
+    sta ball_screen_x
+    sta ball_screen_y
 --    ldai 0x00
---    sta ball_xscreen
 --    sta bg_x
---    sta bg_xscreen
 --    sta bg_y
 
 move_ball = mdo
-    let dir bit result = mdo
-        lda input1
-        andi bit
-        skip beq result
-    dir btn_left (dec ball_x)
-    dir btn_right (inc ball_x)
-    dir btn_up (dec ball_y)
-    dir btn_down (inc ball_y)
+    let move bit bump ball thr branch camera unbump screen = mdo
+            lda input1
+            andi bit
+            skip beq $ do
+                bump ball
+                lda ball
+                sec
+                sbc camera
+                sta screen
+                cmpi thr
+                skip branch $ do
+                    bump camera
+                    unbump screen
+    move btn_left  dec ball_x 0x40 bcs camera_x inc ball_screen_x
+    move btn_right inc ball_x 0xc1 bcc camera_x dec ball_screen_x
+    move btn_up    dec ball_y 0x40 bcs camera_y inc ball_screen_y
+    move btn_down  inc ball_y 0xc1 bcc camera_y dec ball_screen_y
+
 
 draw_ball = do
     let part yexpr tile attr xexpr = mdo
-            lda ball_y
+            lda ball_screen_y
             yexpr
             sta spr_mem
             tile ->* spr_mem
             attr ->* spr_mem
-            lda ball_x
+            lda ball_screen_x
             xexpr
             sta spr_mem
             dec sprites_left
