@@ -102,22 +102,27 @@ prg_main = mdo
         0x20 ->* ppu_address
         0x00 ->* ppu_address
          -- name table
-        let row = 0x00
-        repfor (0x0f ->* row) bne (dec row) $ mdo
+        repfor (ldxi 0x00) bne (cpxi 0xf0) $ mdo
+            let col = 0x00
+                tmpx = 0x01
              -- top row
-            repfor (ldxi 0x0) bne (inx >> cpxi 0x10) $ mdo
+            stx tmpx
+            repfor (0x10 ->* col) bne (dec col) $ mdo
                 ldyxm background
                 lday tiles_tl
                 sta ppu_mem
                 lday tiles_tr
                 sta ppu_mem
+                inx
+            ldx tmpx
              -- bottom row
-            repfor (ldxi 0x0) bne (inx >> cpxi 0x10) $ mdo
+            repfor (0x10 ->* col) bne (dec col) $ mdo
                 ldyxm background
                 lday tiles_bl
                 sta ppu_mem
                 lday tiles_br
                 sta ppu_mem
+                inx
          -- attribute table
         lda 0xAA
         repfor (ldyi 0x40) bne dey $ mdo
