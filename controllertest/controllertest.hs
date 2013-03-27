@@ -18,17 +18,13 @@ top = mdo
 prgbank = mdo
     set_counter 0xc000
     begin <- here
-    (nmi, reset, irq) <- prg_main
-    end <- here
-    fill (0x4000 - (end - begin) - 6) 0xff
+    (nmi, reset, irq) <- pad (0x4000 - 6) 0xff prg_main
     le16 (fromIntegral nmi)
     le16 (fromIntegral reset)
     le16 (fromIntegral irq)
 
 chrbank :: String -> ASM ()
-chrbank file = mdo
-    size <- sizeof$ binfile file
-    fill (0x1000 - size) 0xff
+chrbank = pad 0x1000 0xff . binfile
 
 button_a = 0x80
 button_b = 0x40

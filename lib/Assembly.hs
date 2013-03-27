@@ -1,5 +1,5 @@
 
-module Assembly (Assembly(..), assemble, nothing, here, unit, units, return_assembly, fail_assembly, append_assembly, bind_assembly, set_counter) where
+module Assembly (Assembly(..), assemble, nothing, here, unit, units, pad_assembly, return_assembly, fail_assembly, append_assembly, bind_assembly, set_counter) where
 
 import Data.Monoid
 import qualified Data.Foldable as F
@@ -21,6 +21,18 @@ unit u = Assembly (\c -> (u, succ c, ()))
 
 units :: (Monoid mon, Enum ctr, F.Foldable a) => a mon -> Assembly mon ctr ()
 units us = Assembly (\c -> (F.fold us, F.foldl (const . succ) c us, ()))
+
+pad_assembly :: (Monoid mon, Integral ctr) => ctr -> mon -> Assembly mon ctr a -> Assembly mon ctr a
+pad_assembly size filling (Assembly code) = Assembly f where
+    f start = let
+        (coderes, finish, ret) = code start
+        isize = fromIntegral size :: Int
+        icodesize = fromIntegral finish - fromIntegral start :: Int
+        res = if icodesize > isize
+            then error$ "Code given to pad_assembly was larger than the alloted size ("
+                     ++ show icodesize ++ " > " ++ show isize ++ ")."
+            else coderes <> F.fold (replicate (isize - icodesize) filling)
+        in (res, size, ret)
 
 return_assembly :: Monoid mon => a -> Assembly mon ctr a
 return_assembly x = Assembly (\c -> (mempty, c, x))

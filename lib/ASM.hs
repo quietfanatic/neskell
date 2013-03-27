@@ -3,7 +3,7 @@
 
 module ASM (
     ASM,
-    byte, bytes, ascii, bytestring, binfile, fill, hex, hexdata,
+    byte, bytes, ascii, bytestring, binfile, fill, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
     assemble_asm, no_overflow,
@@ -46,6 +46,9 @@ fill :: Int -> Word8 -> ASM ()
 fill size b = if size >= 0
     then Assembly (\c -> (S.replicate size b, c + size, ()))
     else error$ "Tried to fill a block with negative size (did something assemble too large?)"
+
+pad :: Int -> Word8 -> ASM a -> ASM a
+pad size = pad_assembly size . S.singleton
 
 hex :: String -> [Word8]
 hex [] = []
