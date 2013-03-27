@@ -3,7 +3,7 @@
 
 module ASM (
     ASM,
-    byte, bytes, ascii, fill, hexdata,
+    byte, bytes, ascii, bytestring, fill, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
     assemble_asm, no_overflow,
@@ -30,6 +30,9 @@ byte = unit . S.singleton
 
 bytes :: F.Foldable t => t Word8 -> ASM ()
 bytes bs = Assembly (\c -> (S.fromList (F.toList bs), F.foldl (const . succ) c bs, ()))
+
+bytestring :: B.ByteString -> ASM ()
+bytestring = bytes . B.unpack
 
 ascii :: [Char] -> ASM ()
 ascii = bytes . map (fromIntegral . ord)

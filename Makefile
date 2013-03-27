@@ -1,7 +1,7 @@
 
 soundtest/soundtest.nes : soundtest/soundtest.hs lib/*
 	ghc -ilib soundtest/soundtest.hs -o soundtest/soundtest.exe && soundtest/soundtest.exe > soundtest/soundtest.nes
-controllertest/controllertest.nes : controllertest/controllertest.hs controllertest/prgbank.bin lib/*
+controllertest/controllertest.nes : controllertest/controllertest.hs controllertest/chrbank.bin lib/*
 	ghc -ilib controllertest/controllertest.hs -o controllertest/controllertest.exe && controllertest/controllertest.exe > controllertest/controllertest.nes
 
 .PHONY: clean

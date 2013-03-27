@@ -6,12 +6,15 @@ import ASM
 import ASM6502
 import NES
 
-main = B.putStr (assemble_asm top)
+main = do
+    str <- B.readFile "controllertest/chrbank.bin"
+    B.putStr (assemble_asm (top str))
 
-top = mdo
+top :: B.ByteString -> ASM ()
+top str = mdo
     NES.header 0x01 0x01 0x00
     prgbank
-    chrbank
+    chrbank str
 
 button_a = 0x80
 button_b = 0x40
@@ -25,7 +28,10 @@ button_right = 0x01
 input1 = 0x0100
 input2 = 0x0101
 
-chrbank = bytes (B.readFile "chrbank.bin")
+chrbank :: B.ByteString -> ASM ()
+chrbank str = mdo
+    size <- sizeof$ bytestring str
+    fill (0x2000 - size) 0xff
 
 initialize = mdo
     sei
@@ -63,7 +69,7 @@ read_controllers = mdo
      -- Freeze controllers for polling
     0x01 ->* controller1
     0x00 ->* controller1
-    let read port bits =
+    let read port bits = mdo
         repfor (ldxi 0x07) bpl dex $ mdo
             lda port
             lsra
@@ -76,11 +82,10 @@ prgbank = mdo
     begin <- here
     (reset, nmi, irq) <- prg_main
     end <- here
-    fill (0x4000 - (end - begin) - vector_size) 0xff
-    vector_size <- sizeof$ mdo
-        le16 (fromIntegral reset)
-        le16 (fromIntegral nmi)
-        le16 (fromIntegral irq)
+    fill (0x4000 - (end - begin) - 6) 0xff
+    le16 (fromIntegral reset)
+    le16 (fromIntegral nmi)
+    le16 (fromIntegral irq)
 
 prg_main = mdo
 
@@ -99,6 +104,35 @@ prg_main = mdo
 
     nmi <- startof$ mdo
         read_controllers
+         -- Start sprite memory transfer
+        let sprite_count = 0x01
+        0x00 ->* spr_address
+        sta sprite_count  -- Counts down from 0x100 (really 0x00)
+         -- Draw the buttons
+        lda input1
+        let input_tmp = 0x00
+        sta input_tmp
+        repfor (ldxi 0x07) bpl dex $ mdo
+            ldaxm btnspr_y
+            sta spr_mem
+            ldaxm btnspr_tile
+            sta spr_mem
+            ldaxm btnspr_attr
+            asl input_tmp
+            skip bcs $ mdo
+                orai 0x03
+            sta spr_mem
+            ldaxm btnspr_x
+            sta spr_mem
+            dec sprite_count
+         -- Stow away any unused sprites
+        ldai 0xfe
+        rep bne $ mdo
+            sta spr_mem
+            sta spr_mem
+            sta spr_mem
+            sta spr_mem
+            dec sprite_count
 
     sprite_palettes <- startof$ hexdata$ ""
         ++ "2212020f"
@@ -111,6 +145,15 @@ prg_main = mdo
         ++ "2a1a0a0f"
         ++ "2616060f"
         ++ "3010000f"
+
+    btnspr_x <- startof$ hexdata$
+        "d0 bf c8 c8 e0 d8 e8 f0"
+    btnspr_y <- startof$ hexdata$
+        "d0 d0 d8 c8 d0 d0 d0 d0"
+    btnspr_tile <- startof$ hexdata$
+        "01 01 00 00 03 03 02 02"
+    btnspr_attr <- startof$ hexdata$
+        "40 00 80 00 00 00 01 01"
 
     return (reset, nmi, 0)
 
