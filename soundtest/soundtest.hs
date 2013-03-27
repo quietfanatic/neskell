@@ -9,7 +9,7 @@ import NES
 main = B.putStr (assemble_asm top)
 
 top = mdo
-    NES.header 0x01 0x01 0x00
+    NES.header 0x01 0x01 0x00 0x00
     prgbank
     chrbank
 

@@ -12,7 +12,7 @@ main = do
 
 top :: B.ByteString -> ASM ()
 top str = mdo
-    NES.header 0x01 0x01 0x00
+    NES.header 0x01 0x01 0x00 0x00
     prgbank
     chrbank str
 

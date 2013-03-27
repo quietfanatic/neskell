@@ -1,4 +1,6 @@
 
+build : soundtest/soundtest.nes controllertest/controllertest.nes
+
 soundtest/soundtest.nes : soundtest/soundtest.hs lib/*
 	ghc -ilib soundtest/soundtest.hs -o soundtest/soundtest.exe && soundtest/soundtest.exe > soundtest/soundtest.nes
 controllertest/controllertest.nes : controllertest/controllertest.hs controllertest/chrbank.bin lib/*

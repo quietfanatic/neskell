@@ -1,19 +1,21 @@
 module NES where
 
 import Data.Word
+import Data.Bits
 import ASM
 import ASM6502
 
  -- Provides an ines header.
- --       prgs     chrs     mapper
-header :: Word8 -> Word8 -> Word8 -> ASM ()
-header prgs chrs mapper = do
+ --       prgs     chrs     mapper   flags
+header :: Word8 -> Word8 -> Word8 -> Word8 -> ASM ()
+header prgs chrs mapper flags = do
     ascii "NES"
     byte 0x1a
     byte prgs
     byte chrs
-    byte mapper
-    fill 9 0
+    byte (shiftL (mapper .&. 0xf) 4 .|. (flags .&. 0xf))
+    byte ((mapper .&. 0xf0) .|. shiftR (flags .&. 0xf0) 4)
+    fill 8 0
 
  -- The names of various memory-mapped ports
 
