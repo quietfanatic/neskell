@@ -124,7 +124,7 @@ prg_main = mdo
                 sta ppu_mem
                 inx
          -- attribute table
-        lda 0xAA
+        ldai 0xAA
         repfor (ldyi 0x40) bne dey $ mdo
             sta ppu_mem
          -- enable rendering
