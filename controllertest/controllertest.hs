@@ -94,7 +94,7 @@ prg_main = mdo
         lda ppu_status
         0x3f ->* ppu_address
         0x00 ->* ppu_address
-        repfor (ldyi 0x20) bne dey $ mdo
+        repfor (ldyi 0x1f) bpl dey $ mdo
             lday sprite_palettes
             sta ppu_mem
          -- Draw background
