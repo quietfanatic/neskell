@@ -7,14 +7,16 @@ import ASM6502
 import NES
 
 main = do
-    str <- B.readFile "controllertest/chrbank.bin"
-    B.putStr (assemble_asm (top str))
+    spr <- B.readFile "controllertest/sprites.bin"
+    bg <- B.readFile "controllertest/background.bin"
+    B.putStr (assemble_asm (top spr bg))
 
-top :: B.ByteString -> ASM ()
-top str = mdo
+top :: B.ByteString -> B.ByteString -> ASM ()
+top spr bg = mdo
     NES.header 0x01 0x01 0x00 0x00
     prgbank
-    chrbank str
+    chrbank spr
+    chrbank bg
 
 button_a = 0x80
 button_b = 0x40
@@ -31,7 +33,7 @@ input2 = 0x0101
 chrbank :: B.ByteString -> ASM ()
 chrbank str = mdo
     size <- sizeof$ bytestring str
-    fill (0x2000 - size) 0xff
+    fill (0x1000 - size) 0xff
 
 initialize = mdo
     sei
@@ -95,15 +97,24 @@ prg_main = mdo
         lda ppu_status
         0x3f ->* ppu_address
         0x00 ->* ppu_address
-        repfor (ldyi 0x1f) bpl dey $ mdo
+        repfor (ldyi 0x20) bne dey $ mdo
             lday sprite_palettes
             sta ppu_mem
          -- enable rendering
         0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
-        0x18 ->* ppu_mask  -- 00011000
+        0x1e ->* ppu_mask  -- 00011110
+         -- Draw background
         lda ppu_status
         0x20 ->* ppu_address
         0x00 ->* ppu_address
+         -- name table
+        repfor (ldyi 0x0f) bne dey $ mdo
+            repfor (ldxi 0x40) bne dex $ mdo
+                sta ppu_mem
+         -- attribute table
+        lda 0xAA
+        repfor (ldyi 0x40) bne dey $ mdo
+            sta ppu_mem
         jmp idle
 
     nmi <- startof$ mdo
