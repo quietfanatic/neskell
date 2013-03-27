@@ -3,7 +3,7 @@
 
 module ASM (
     ASM,
-    byte, bytes, ascii, bytestring, fill, hexdata,
+    byte, bytes, ascii, bytestring, binfile, fill, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
     assemble_asm, no_overflow,
@@ -18,7 +18,8 @@ import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import qualified Data.ByteString as B
 import Assembly
-import Unsafe.Coerce
+import Unsafe.Coerce  -- for serializing floats and doubles
+import System.IO.Unsafe  -- for binfile
 
 type ASM a = Assembly (S.Seq Word8) Int a
 
@@ -31,23 +32,29 @@ byte = unit . S.singleton
 bytes :: F.Foldable t => t Word8 -> ASM ()
 bytes bs = Assembly (\c -> (S.fromList (F.toList bs), F.foldl (const . succ) c bs, ()))
 
+ascii :: [Char] -> ASM ()
+ascii = bytes . map (fromIntegral . ord)
+
 bytestring :: B.ByteString -> ASM ()
 bytestring = bytes . B.unpack
 
-ascii :: [Char] -> ASM ()
-ascii = bytes . map (fromIntegral . ord)
+{-# NOINLINE binfile #-}
+binfile :: String -> ASM ()
+binfile = bytestring . unsafePerformIO . B.readFile
 
 fill :: Int -> Word8 -> ASM ()
 fill size b = if size >= 0
     then Assembly (\c -> (S.replicate size b, c + size, ()))
     else error$ "Tried to fill a block with negative size (did something assemble too large?)"
 
+hex :: String -> [Word8]
+hex [] = []
+hex (c:rest) | not (isHexDigit c) = hex rest
+hex (h:l:rest) | isHexDigit l = fromIntegral (digitToInt h * 16 + digitToInt l) : hex rest
+hex _ = error "Odd number of hex digits in hexdata string."
+
 hexdata :: String -> ASM ()
-hexdata = bytes . f where
-    f [] = []
-    f (c:rest) | not (isHexDigit c) = f rest
-    f (h:l:rest) | isHexDigit l = fromIntegral (digitToInt h * 16 + digitToInt l) : f rest
-    f _ = error "Odd number of hex digits in hexdata string."
+hexdata = bytes . hex
 
 le16 :: Word16 -> ASM ()
 le16 w = do

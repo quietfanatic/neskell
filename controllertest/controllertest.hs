@@ -7,16 +7,13 @@ import ASM6502
 import NES
 
 main = do
-    spr <- B.readFile "controllertest/sprites.bin"
-    bg <- B.readFile "controllertest/background.bin"
-    B.putStr (assemble_asm (top spr bg))
+    B.putStr (assemble_asm top)
 
-top :: B.ByteString -> B.ByteString -> ASM ()
-top spr bg = mdo
+top = mdo
     NES.header 0x01 0x01 0x00 0x00
     prgbank
-    chrbank spr
-    chrbank bg
+    chrbank "controllertest/sprites.bin"
+    chrbank "controllertest/background.bin"
 
 button_a = 0x80
 button_b = 0x40
@@ -30,9 +27,9 @@ button_right = 0x01
 input1 = 0x0100
 input2 = 0x0101
 
-chrbank :: B.ByteString -> ASM ()
-chrbank str = mdo
-    size <- sizeof$ bytestring str
+chrbank :: String -> ASM ()
+chrbank file = mdo
+    size <- sizeof$ binfile file
     fill (0x1000 - size) 0xff
 
 initialize = mdo
