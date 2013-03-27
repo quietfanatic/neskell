@@ -5,6 +5,7 @@ import qualified Data.ByteString as B
 import ASM
 import ASM6502
 import NES
+import Data.Bits ((.|.))
 
 main = do
     B.putStr (assemble_asm top)
@@ -168,8 +169,9 @@ prg_main = mdo
         repfor (ldyi 0x40) bne dey $ mdo
             sta ppu_mem
          -- enable rendering
-        0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
-        0x1e ->* ppu_mask  -- 00011110
+        ppu_ctrl *<- ppu_enable_nmi .|. ppu_background_1000
+        ppu_mask *<- ppu_dont_clip_background .|. ppu_dont_clip_sprites
+                 .|. ppu_enable_background .|. ppu_enable_sprites
         
         init_ball
         jmp idle

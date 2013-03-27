@@ -458,7 +458,10 @@ tya = byte 0x98
 
 
 infix 2 ->*
+infix 2 *<-
 infix 2 *->*
+infix 2 *<-*
 val ->* mem = ldai val >> sta mem
 a *->* b = lda a >> sta b
-
+mem *<- val = ldai val >> sta mem
+b *<-* a = lda a >> sta b
