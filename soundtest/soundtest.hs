@@ -187,20 +187,20 @@ prgbank1 = mdo
         lday sprite_palettes
         sta ppumem
 
-    mdo  -- initialize background (doesn't seem to be working)
-        lda ppustatus
-        0x20 ->* ppuaddress
-        ldxi 0x00
-        stx ppuaddress
+     -- initialize background or something
+    lda ppustatus
+    0x20 ->* ppuaddress
+    ldxi 0x00
+    stx ppuaddress
 
-        ldai 0x00
-        repfor (ldyi 0x40) bne dey $ mdo
-            repfor (ldxi 0xf0) bne dex $ mdo
-                sta ppumem
-
-        ldai 0xaa
-        repfor (ldxi 0x40) bne dex $ mdo
+    ldai 0x00
+    repfor (ldyi 0x40) bne dey $ mdo
+        repfor (ldxi 0xf0) bne dex $ mdo
             sta ppumem
+
+    ldai 0xaa
+    repfor (ldxi 0x40) bne dex $ mdo
+        sta ppumem
 
      -- enable rendering
     0x90 ->* ppuctrl  -- 10010000 enable nmi, background at ppu0x1000
