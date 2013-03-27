@@ -38,9 +38,9 @@ subz x = sec >> sbcz x
 subm x = sec >> sbcm x
 sub x = sec >> sbc x
 
-btn_bits :: [Word8]
-btn_bits = 1 : map (flip shiftL 1) btn_bits
-[btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] = take 8 btn_bits
+bitlist :: [Word8]
+bitlist = map (shiftL 1) [0..]
+[btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] = take 8 bitlist
 
 input1 = 0x0100
 input2 = 0x0101
