@@ -206,9 +206,8 @@ prg_main = mdo
             dec sprites_left
          -- Set the bg scroll
         lda ppu_status
-        ldai 0x00
-        sta ppu_scroll
-        sta ppu_scroll
+        camera_x *->* ppu_scroll
+        camera_y *->* ppu_scroll
         rti
 
     sprite_palettes <- startof$ hexdata$ ""
