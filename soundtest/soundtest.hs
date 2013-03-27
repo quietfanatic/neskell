@@ -101,7 +101,7 @@ prgbank = mdo
     lda ppu_status
     0x3f ->* ppu_address
     0x00 ->* ppu_address
-    repfor (ldyi 0x1f) bpl dey $ mdo
+    repfor (ldyi 0x1f) (dey >>. bpl) $ mdo
         lday sprite_palettes
         sta ppu_mem
 
@@ -112,12 +112,12 @@ prgbank = mdo
     stx ppu_address
 
     ldai 0x00
-    repfor (ldyi 0x40) bne dey $ mdo
-        repfor (ldxi 0xf0) bne dex $ mdo
+    repfor (ldyi 0x40) (dey >>. bne) $ mdo
+        repfor (ldxi 0xf0) (dex >>. bne) $ mdo
             sta ppu_mem
 
     ldai 0xaa
-    repfor (ldxi 0x40) bne dex $ mdo
+    repfor (ldxi 0x40) (dex >>. bne) $ mdo
         sta ppu_mem
 
      -- enable rendering
@@ -140,11 +140,11 @@ prgbank = mdo
      -- read controllers
     0x01 ->* controller1
     0x00 ->* controller1  -- controller poll sequence
-    repfor (ldxi 0x07) bpl dex $ mdo
+    repfor (ldxi 0x07) (dex >>. bpl) $ mdo
         lda controller1
         lsra
         rol input1
-    repfor (ldxi 0x07) bpl dex $ mdo
+    repfor (ldxi 0x07) (dex >>. bpl) $ mdo
         lda controller2
         lsra
         rol input2

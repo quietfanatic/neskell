@@ -78,7 +78,7 @@ initialize_begin = do
     rep bpl (bitm ppu_status)
 
 clear_memory = do
-    repfor (ldxi 0x00) bne dex $ do
+    repfor (ldxi 0x00) (dex >>. bne) $ do
         ldai 0x00
         stax 0x00
         stax 0x0100

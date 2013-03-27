@@ -115,7 +115,7 @@ read_controllers = mdo
     0x01 ->* controller1
     0x00 ->* controller1
     let read port bits = mdo
-        repfor (ldxi 0x07) bpl dex $ mdo
+        repfor (ldxi 0x07) (dex >>. bpl) $ mdo
             lda port
             lsra
             rol bits
@@ -132,7 +132,7 @@ prg_main = mdo
         lda ppu_status
         0x3f ->* ppu_address
         0x00 ->* ppu_address
-        repfor (ldyi 0x1f) bpl dey $ mdo
+        repfor (ldyi 0x1f) (dey >>. bpl) $ mdo
             lday sprite_palettes
             sta ppu_mem
          -- Draw background
@@ -140,12 +140,12 @@ prg_main = mdo
         0x20 ->* ppu_address
         0x00 ->* ppu_address
          -- name table
-        repfor (ldxi 0x00) bne (cpxi 0xf0) $ mdo
+        repfor (ldxi 0x00) (cpxi 0xf0 >>. bne) $ mdo
             let col = 0x00
                 tmpx = 0x01
              -- top row
             stx tmpx
-            repfor (0x10 ->* col) bne (dec col) $ mdo
+            repfor (0x10 ->* col) (dec col >>. bne) $ mdo
                 ldyxm background
                 lday tiles_tl
                 sta ppu_mem
@@ -154,7 +154,7 @@ prg_main = mdo
                 inx
             ldx tmpx
              -- bottom row
-            repfor (0x10 ->* col) bne (dec col) $ mdo
+            repfor (0x10 ->* col) (dec col >>. bne) $ mdo
                 ldyxm background
                 lday tiles_bl
                 sta ppu_mem
@@ -163,7 +163,7 @@ prg_main = mdo
                 inx
          -- attribute table
         ldai 0xAA
-        repfor (ldyi 0x40) bne dey $ mdo
+        repfor (ldyi 0x40) (dey >>. bne) $ mdo
             sta ppu_mem
          -- enable rendering
         ppu_ctrl *<- ppu_enable_nmi .|. ppu_background_1000
@@ -181,7 +181,7 @@ prg_main = mdo
          -- Draw the buttons
         let input_tmp = 0x00
         input1 *->* input_tmp
-        repfor (ldxi 0x07) bpl dex $ mdo
+        repfor (ldxi 0x07) (dex >>. bpl) $ mdo
             ldaxm btnspr_y
             sta spr_mem
             ldaxm btnspr_tile

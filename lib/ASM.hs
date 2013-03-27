@@ -8,7 +8,7 @@ module ASM (
     nothing, here, set_counter,
     assemble_asm, no_overflow,
     startof, endof, sizeof,
-    rep, repfor, skip,
+    rep, repfor, skip, (>>.)
 ) where
 
 import Data.Word
@@ -139,12 +139,11 @@ rep branch code = mdo
     branch start
     return res
 
-repfor :: ASM () -> (Int -> ASM ()) -> ASM () -> ASM a -> ASM a
-repfor init branch inc code = mdo
+repfor :: ASM () -> (Int -> ASM ()) -> ASM a -> ASM a
+repfor init branch code = mdo
     init
     start <- here
     res <- code
-    inc
     branch start
     return res
 
@@ -155,3 +154,5 @@ skip branch code = mdo
     end <- here
     return res
 
+infixl 1 >>. 
+cmp >>. branch = (cmp >>) . branch
