@@ -48,8 +48,7 @@ initialize = mdo
     rep bpl $ mdo
         bit ppu_status
      -- clear memory
-    ldxi 0x00
-    rep bne $ mdo
+    repfor (ldxi 0x00) bne dex $ mdo
         ldai 0x00
         stax 0x00
         stax 0x0100
@@ -60,7 +59,6 @@ initialize = mdo
         stax 0x0700
         ldai 0xff
         stax 0x0200
-        dex
      -- wait for second vblank
     rep bpl $ mdo
         bit ppu_status
@@ -80,14 +78,16 @@ read_controllers = mdo
 prgbank = mdo
     set_counter 0xc000
     begin <- here
-    (reset, nmi, irq) <- prg_main
+    (nmi, reset, irq) <- prg_main
     end <- here
     fill (0x4000 - (end - begin) - 6) 0xff
-    le16 (fromIntegral reset)
     le16 (fromIntegral nmi)
+    le16 (fromIntegral reset)
     le16 (fromIntegral irq)
 
 prg_main = mdo
+    
+    idle <- startof$ jmp idle
 
     reset <- startof$ mdo
         initialize
@@ -98,20 +98,24 @@ prg_main = mdo
         repfor (ldyi 0x1f) bpl dey $ mdo
             lday sprite_palettes
             sta ppu_mem
-             -- enable rendering
-            0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
-            0x1e ->* ppu_mask  -- 00011110
+         -- enable rendering
+        0x90 ->* ppu_ctrl  -- 10010000 enable nmi, bg at ppu0x1000
+        0x18 ->* ppu_mask  -- 00011000
+        lda ppu_status
+        0x20 ->* ppu_address
+        0x00 ->* ppu_address
+        jmp idle
 
     nmi <- startof$ mdo
         read_controllers
          -- Start sprite memory transfer
         let sprite_count = 0x01
         0x00 ->* spr_address
-        sta sprite_count  -- Counts down from 0x100 (really 0x00)
+        ldai 0x40
+        sta sprite_count
          -- Draw the buttons
-        lda input1
         let input_tmp = 0x00
-        sta input_tmp
+        input1 *->* input_tmp
         repfor (ldxi 0x07) bpl dex $ mdo
             ldaxm btnspr_y
             sta spr_mem
@@ -133,6 +137,11 @@ prg_main = mdo
             sta spr_mem
             sta spr_mem
             dec sprite_count
+         -- Set the bg scroll
+        ldai 0x00
+        sta ppu_scroll
+        sta ppu_scroll
+        jmp idle
 
     sprite_palettes <- startof$ hexdata$ ""
         ++ "2212020f"
@@ -155,5 +164,5 @@ prg_main = mdo
     btnspr_attr <- startof$ hexdata$
         "40 00 80 00 00 00 01 01"
 
-    return (reset, nmi, 0)
+    return (nmi, reset, 0)
 
