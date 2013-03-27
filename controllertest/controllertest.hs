@@ -146,7 +146,7 @@ prg_main = mdo
              -- top row
             stx tmpx
             repfor (0x10 ->* col) (dec col >>. bne) $ mdo
-                ldyxm background
+                ldyx background
                 lday tiles_tl
                 sta ppu_mem
                 lday tiles_tr
@@ -155,7 +155,7 @@ prg_main = mdo
             ldx tmpx
              -- bottom row
             repfor (0x10 ->* col) (dec col >>. bne) $ mdo
-                ldyxm background
+                ldyx background
                 lday tiles_bl
                 sta ppu_mem
                 lday tiles_br
@@ -182,16 +182,16 @@ prg_main = mdo
         let input_tmp = 0x00
         input1 *->* input_tmp
         repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-            ldaxm btnspr_y
+            ldax btnspr_y
             sta spr_mem
-            ldaxm btnspr_tile
+            ldax btnspr_tile
             sta spr_mem
-            ldaxm btnspr_attr
+            ldax btnspr_attr
             asl input_tmp
             skip bcs $ mdo
                 orai 0x03
             sta spr_mem
-            ldaxm btnspr_x
+            ldax btnspr_x
             sta spr_mem
             dec sprites_left
          -- Draw the ball

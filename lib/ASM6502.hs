@@ -48,8 +48,8 @@ op8or16' :: (Integral x, Show x, Bounded x) => x -> Word8 -> Word8 -> x -> ASM65
 op8or16' max a b x = case max of
     255 -> byte a >> byte (fromIntegral x)
     127 -> byte a >> byte (fromIntegral x)
-    65535 -> byte a >> le16 (fromIntegral x)
-    32767 -> byte a >> le16 (fromIntegral x)
+    65535 -> byte b >> le16 (fromIntegral x)
+    32767 -> byte b >> le16 (fromIntegral x)
     _ -> case no_overflow x of
         Just w8 -> byte a >> byte w8
         Nothing -> case no_overflow x of
