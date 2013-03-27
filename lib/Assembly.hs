@@ -5,7 +5,7 @@ import Data.Monoid
 import qualified Data.Foldable as F
 import Control.Monad.Fix
 
-data Assembly mon ctr a = Assembly (ctr -> (mon, ctr, a))
+newtype Assembly mon ctr a = Assembly (ctr -> (mon, ctr, a))
 
 assemble :: Num ctr => Assembly mon ctr a -> mon
 assemble (Assembly f) = comp where (comp, _, _) = f 0
