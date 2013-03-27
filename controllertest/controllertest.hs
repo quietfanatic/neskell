@@ -15,6 +15,21 @@ top = mdo
     chrbank "controllertest/sprites.bin"
     chrbank "controllertest/background.bin"
 
+prgbank = mdo
+    set_counter 0xc000
+    begin <- here
+    (nmi, reset, irq) <- prg_main
+    end <- here
+    fill (0x4000 - (end - begin) - 6) 0xff
+    le16 (fromIntegral nmi)
+    le16 (fromIntegral reset)
+    le16 (fromIntegral irq)
+
+chrbank :: String -> ASM ()
+chrbank file = mdo
+    size <- sizeof$ binfile file
+    fill (0x1000 - size) 0xff
+
 button_a = 0x80
 button_b = 0x40
 button_select = 0x20
@@ -27,10 +42,48 @@ button_right = 0x01
 input1 = 0x0100
 input2 = 0x0101
 
-chrbank :: String -> ASM ()
-chrbank file = mdo
-    size <- sizeof$ binfile file
-    fill (0x1000 - size) 0xff
+ -- Keeps track of how many sprites have been drawn so far.
+ -- Only valid during drawing phase.
+sprites_left = 0x0f
+
+ -- Let's have a ball that's moved by the arrow keys.
+ -- That's original, right?
+
+ball_x = 0x10
+ball_y = 0x10
+
+init_ball = mdo
+    0x80 ->* ball_x
+    0x80 ->* ball_y
+
+move_ball = mdo
+    let dir bit result = mdo
+        lda input1
+        andi bit
+        skip bne result
+    dir button_left (dec ball_x)
+    dir button_right (inc ball_x)
+    dir button_up (dec ball_y)
+    dir button_down (inc ball_y)
+
+draw_ball = do
+    let part yexpr tile attr xexpr = mdo
+            lda ball_y
+            yexpr
+            sta ppu_mem
+            tile ->* ppu_mem
+            attr ->* ppu_mem
+            lda ball_x
+            xexpr
+            sta ppu_mem
+            dec sprites_left
+        add8 = clc >> adci 0x08
+    part nothing 0x05 0x01 nothing
+    part add8 0x06 0x01 nothing
+    part nothing 0x05 0x41 add8
+    part add8 0x06 0x41 add8
+
+ -- Main code stuff
 
 initialize = mdo
     sei
@@ -73,16 +126,6 @@ read_controllers = mdo
             rol bits
     read controller1 input1
     read controller2 input2
-
-prgbank = mdo
-    set_counter 0xc000
-    begin <- here
-    (nmi, reset, irq) <- prg_main
-    end <- here
-    fill (0x4000 - (end - begin) - 6) 0xff
-    le16 (fromIntegral nmi)
-    le16 (fromIntegral reset)
-    le16 (fromIntegral irq)
 
 prg_main = mdo
     
@@ -135,10 +178,8 @@ prg_main = mdo
     nmi <- startof$ mdo
         read_controllers
          -- Start sprite memory transfer
-        let sprite_count = 0x01
         0x00 ->* spr_address
-        ldai 0x40
-        sta sprite_count
+        0x40 ->* sprites_left
          -- Draw the buttons
         let input_tmp = 0x00
         input1 *->* input_tmp
@@ -154,7 +195,10 @@ prg_main = mdo
             sta spr_mem
             ldaxm btnspr_x
             sta spr_mem
-            dec sprite_count
+            dec sprites_left
+         -- Draw the ball
+        move_ball
+        draw_ball
          -- Stow away any unused sprites
         ldai 0xfe
         rep bne $ mdo
@@ -162,7 +206,7 @@ prg_main = mdo
             sta spr_mem
             sta spr_mem
             sta spr_mem
-            dec sprite_count
+            dec sprites_left
          -- Set the bg scroll
         lda ppu_status
         ldai 0x00
