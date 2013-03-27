@@ -1,8 +1,6 @@
 
 {-# LANGUAGE RecursiveDo #-}
 
-import Data.Char
-import qualified Data.Bits as DB
 import qualified Data.ByteString as B
 import ASM
 import ASM6502
