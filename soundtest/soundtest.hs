@@ -1,19 +1,17 @@
 
 {-# LANGUAGE RecursiveDo #-}
 
-import ASM
 import Data.Char
 import qualified Data.Bits as DB
-import ASM6502
 import qualified Data.ByteString as B
-
+import ASM
+import ASM6502
+import NES
 
 main = B.putStr (assemble_asm top)
 
 top = mdo
-    ascii "NES"
-    bytes [0x1a, 0x01, 0x01, 0x01, 0x00]
-    fill 8 0x00
+    NES.header 0x01 0x01 0x01
     prgbank0
     prgbank1
     chrbank
@@ -22,35 +20,6 @@ chrbank = fill 0x2000 0xff
 
 prgbank0 = fill 0x2000 0xff
 
-ppuctrl = 0x2000
-ppumask = 0x2001
-ppustatus = 0x2002
-spraddress = 0x2003
-sprmem = 0x2004
-ppuscroll = 0x2005
-ppuaddress = 0x2006
-ppumem = 0x2007
-
-type ChannelPorts = Int
-chn_env = (+ 0)
-chn_low = (+ 2)
-chn_high = (+ 3)
-
-chn_square1 = 0x4000
-chn_square2 = 0x4004
-
-sq1_env = 0x4000
-sq1_low = 0x4002
-sq1_high = 0x4003
-sq2_env = 0x4004
-sq2_low = 0x4006
-sq2_high = 0x4007
-
-sprdma = 0x4014
-apuflags = 0x4015
-controller1 = 0x4016
-controller2 = 0x4017
-apuctrl = 0x4017
 
  -- bits representing the buttons
 button_a = 0x80
@@ -62,41 +31,30 @@ button_down = 0x04
 button_left = 0x02
 button_right = 0x01
 
-frame256 = 0x80
-
-type Channel_State = Int
-
 channel_program = (+ 0)
 channel_pos = (+ 2)
 channel_timer = (+ 4)
 
-square1 = 0x90
-square2 = 0x98
-
-sqr1_program = 0x90
-sqr1_pos = 0x92
-sqr1_timer = 0x94
-sqr2_program = 0x98
-sqr2_pos = 0x9a
-sqr2_timer = 0x9c
+square1_state = 0x90
+square2_state = 0x98
 
  -- where the controller bitfields are stored
 input1 = 0x0100
 input2 = 0x0101
 
-init_sound_engine chn ch program = mdo
+init_sound_engine ch program = mdo
     low program ->* (channel_program ch)
     high program ->* (channel_program ch) + 1
     0x00 ->* channel_pos ch
     0x04 ->* channel_timer ch
 
-sound_engine chn ch note_table default_env = mdo
+sound_engine nesch ch note_table default_env = mdo
     let timer = channel_timer ch
         pos = channel_pos ch
         program = channel_program ch
-        env = chn_env chn
-        low = chn_low chn
-        high = chn_high chn
+        env = NES.channel_env nesch
+        low = NES.channel_low nesch
+        high = NES.channel_high nesch
     dec timer
     skip bne $ mdo
         read_note <- here
@@ -146,13 +104,13 @@ initialize = mdo
     ldxi 0xff
     txs        -- make stack
     inx
-    stx ppuctrl  -- disable nmi
-    stx ppumask  -- disable rendering
+    stx ppu_ctrl  -- disable nmi
+    stx ppu_mask  -- disable rendering
     stx 0x4010  -- disable dmc irqs
 
      -- wait for first vblank
     rep bpl $ mdo
-        bit ppustatus
+        bit ppu_status
      -- clear memory
     ldxi 0x00
     rep bne $ mdo
@@ -169,7 +127,7 @@ initialize = mdo
         dex
      -- wait for second vblank
     rep bpl $ mdo
-        bit ppustatus
+        bit ppu_status
 
 
 prgbank1 = mdo
@@ -180,45 +138,44 @@ prgbank1 = mdo
     initialize
 
      -- Load a palette set
-    lda ppustatus
-    0x3f ->* ppuaddress
-    0x00 ->* ppuaddress
+    lda ppu_status
+    0x3f ->* ppu_address
+    0x00 ->* ppu_address
     repfor (ldyi 0x1f) bpl dey $ mdo
         lday sprite_palettes
-        sta ppumem
+        sta ppu_mem
 
      -- initialize background or something
-    lda ppustatus
-    0x20 ->* ppuaddress
+    lda ppu_status
+    0x20 ->* ppu_address
     ldxi 0x00
-    stx ppuaddress
+    stx ppu_address
 
     ldai 0x00
     repfor (ldyi 0x40) bne dey $ mdo
         repfor (ldxi 0xf0) bne dex $ mdo
-            sta ppumem
+            sta ppu_mem
 
     ldai 0xaa
     repfor (ldxi 0x40) bne dex $ mdo
-        sta ppumem
+        sta ppu_mem
 
      -- enable rendering
-    0x90 ->* ppuctrl  -- 10010000 enable nmi, background at ppu0x1000
-    0x1e ->* ppumask  -- 00011110
+    0x90 ->* ppu_ctrl  -- 10010000 enable nmi, background at ppu0x1000
+    0x1e ->* ppu_mask  -- 00011110
 
      -- enable sound
-    0x30 ->* sq1_env  -- 00110000
-    0x30 ->* sq2_env  -- 00110000
-    0x03 ->* apuflags  -- 00000011
+    0x30 ->* square1_env  -- 00110000
+    0x30 ->* square2_env  -- 00110000
+    0x03 ->* apu_flags  -- 00000011
 
-    init_sound_engine chn_square1 square1 square1_program
-    init_sound_engine chn_square2 square2 square2_program
+    init_sound_engine square1_state square1_program
+    init_sound_engine square2_state square2_program
 
     idle <- here
     jmp idle
 
     nmi <- here
-    inc frame256
 
      -- read controllers
     0x01 ->* controller1
@@ -232,8 +189,8 @@ prgbank1 = mdo
         lsra
         rol input2
 
-    sound_engine chn_square1 square1 note_table 0x33
-    sound_engine chn_square2 square2 note_table 0x32
+    sound_engine NES.square1 square1_state note_table 0x33
+    sound_engine NES.square2 square2_state note_table 0x32
 
     done <- here
     rti
