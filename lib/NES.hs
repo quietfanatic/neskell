@@ -7,7 +7,7 @@ import Data.Bits
 
  -- Provides an ines header.
  --       prgs     chrs     mapper   flags
-header :: Word8 -> Word8 -> Word8 -> Word8 -> ASM ()
+header :: Word8 -> Word8 -> Word8 -> Word8 -> ASM6502 ()
 header prgs chrs mapper flags = do
     ascii "NES"
     byte 0x1a

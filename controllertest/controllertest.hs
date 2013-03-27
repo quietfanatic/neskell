@@ -25,7 +25,7 @@ prgbank = mdo
     le16 (fromIntegral reset)
     le16 (fromIntegral irq)
 
-chrbank :: String -> ASM ()
+chrbank :: String -> ASM6502 ()
 chrbank = pad 0x1000 0xff . binfile
 
  -- Some utility pseudoops
@@ -115,10 +115,10 @@ read_controllers = mdo
     0x01 ->* controller1
     0x00 ->* controller1
     let read port bits = mdo
-        repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-            lda port
-            lsra
-            rol bits
+            repfor (ldxi 0x07) (dex >>. bpl) $ mdo
+                lda port
+                lsra
+                rol bits
     read controller1 input1
     read controller2 input2
 
@@ -199,12 +199,11 @@ prg_main = mdo
         draw_ball
          -- Stow away any unused sprites
         ldai 0xfe
-        rep bne $ mdo
+        rep (dec sprites_left >>. bne) $ mdo
             sta spr_mem
             sta spr_mem
             sta spr_mem
             sta spr_mem
-            dec sprites_left
          -- Set the bg scroll
         lda ppu_status
         camera_x *->* ppu_scroll
