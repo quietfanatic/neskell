@@ -132,25 +132,26 @@ sizeof x = do
     end <- here
     return (end - start)
 
-
-rep :: (Int -> ASM ()) -> ASM () -> ASM ()
+rep :: (Int -> ASM ()) -> ASM a -> ASM a
 rep branch code = mdo
     start <- here
-    code
+    res <- code
     branch start
+    return res
 
-repfor :: ASM () -> (Int -> ASM ()) -> ASM () -> ASM () -> ASM ()
+repfor :: ASM () -> (Int -> ASM ()) -> ASM () -> ASM a -> ASM a
 repfor init branch inc code = mdo
     init
     start <- here
-    code
+    res <- code
     inc
     branch start
+    return res
 
-skip :: (Int -> ASM ()) -> ASM () -> ASM ()
+skip :: (Int -> ASM ()) -> ASM a -> ASM a
 skip branch code = mdo
     branch end
-    code
+    res <- code
     end <- here
-    nothing
+    return res
 

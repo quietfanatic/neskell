@@ -1,8 +1,9 @@
 module NES where
 
 import Data.Word
-import Data.Bits
 import ASM
+import ASM6502 hiding (bit)
+import Data.Bits
 
  -- Provides an ines header.
  --       prgs     chrs     mapper   flags
@@ -62,4 +63,36 @@ controller1 = 0x4016 :: Word16
 controller2 = 0x4017 :: Word16
 apu_ctrl = 0x4017 :: Word16
 
+initialize_begin = do
+    sei
+    cld
+    0x40 ->* 0x4017  -- disable apu frame irq
+    ldxi 0xff
+    txs        -- make stack
+    inx
+    stx ppu_ctrl  -- disable nmi
+    stx ppu_mask  -- disable rendering
+    stx 0x4010  -- disable dmc irqs
+
+     -- wait for first vblank
+    rep bpl (bitm ppu_status)
+
+clear_memory = do
+    repfor (ldxi 0x00) bne dex $ do
+        ldai 0x00
+        stax 0x00
+        stax 0x0100
+        stax 0x0200
+        stax 0x0300
+        stax 0x0400
+        stax 0x0500
+        stax 0x0600
+        stax 0x0700
+
+initialize_end = do
+     -- wait for second vblank
+    rep bpl (bitm ppu_status)
+
+initialize_custom_clear clear = initialize_begin >> clear >> initialize_end
+initialize = initialize_custom_clear clear_memory
 

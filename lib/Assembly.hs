@@ -66,7 +66,7 @@ fix_assembly f = Assembly g where
         in (res, end, ret)
 
 set_counter :: (Monoid mon) => ctr -> Assembly mon ctr ()
-set_counter new = Assembly (\old -> (mempty, new, ()))
+set_counter new = Assembly (\_ -> (mempty, new, ()))
 
 instance (Monoid mon, Show ctr) => Monad (Assembly mon ctr) where
     return = return_assembly

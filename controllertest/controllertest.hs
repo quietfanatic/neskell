@@ -5,7 +5,7 @@ import qualified Data.ByteString as B
 import ASM
 import ASM6502
 import NES
-import Data.Bits ((.|.))
+import Data.Bits ((.|.), shiftL)
 
 main = do
     B.putStr (assemble_asm top)
@@ -27,14 +27,9 @@ prgbank = mdo
 chrbank :: String -> ASM ()
 chrbank = pad 0x1000 0xff . binfile
 
-button_a = 0x80
-button_b = 0x40
-button_select = 0x20
-button_start = 0x10
-button_up = 0x08
-button_down = 0x04
-button_left = 0x02
-button_right = 0x01
+
+btn_bits = 1 : map (shiftL 1) btn_bits
+[btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] = take 8 btn_bits
 
 input1 = 0x0100
 input2 = 0x0101
@@ -47,22 +42,31 @@ sprites_left = 0x0f
  -- That's original, right?
 
 ball_x = 0x10
-ball_y = 0x11
+ball_xscreen = 0x11
+ball_y = 0x12
+bg_x = 0x13
+bg_xscreen = 0x14
+bg_y = 0x15
 
 init_ball = mdo
     ldai 0x80
     sta ball_x
     sta ball_y
+--    ldai 0x00
+--    sta ball_xscreen
+--    sta bg_x
+--    sta bg_xscreen
+--    sta bg_y
 
 move_ball = mdo
     let dir bit result = mdo
         lda input1
         andi bit
         skip beq result
-    dir button_left (dec ball_x)
-    dir button_right (inc ball_x)
-    dir button_up (dec ball_y)
-    dir button_down (inc ball_y)
+    dir btn_left (dec ball_x)
+    dir btn_right (inc ball_x)
+    dir btn_up (dec ball_y)
+    dir btn_down (inc ball_y)
 
 draw_ball = do
     let part yexpr tile attr xexpr = mdo
@@ -82,36 +86,6 @@ draw_ball = do
     part add8 0x06 0x41 add8
 
  -- Main code stuff
-
-initialize = mdo
-    sei
-    cld
-    0x40 ->* 0x4017  -- disable apu frame irq
-    ldxi 0xff
-    txs        -- make stack
-    inx
-    stx ppu_ctrl  -- disable nmi
-    stx ppu_mask  -- disable rendering
-    stx 0x4010  -- disable dmc irqs
-
-     -- wait for first vblank
-    rep bpl $ mdo
-        bit ppu_status
-     -- clear memory
-    repfor (ldxi 0x00) bne dex $ mdo
-        ldai 0x00
-        stax 0x00
-        stax 0x0100
-        stax 0x0300
-        stax 0x0400
-        stax 0x0500
-        stax 0x0600
-        stax 0x0700
-        ldai 0xff
-        stax 0x0200
-     -- wait for second vblank
-    rep bpl $ mdo
-        bit ppu_status
 
 read_controllers = mdo
      -- Freeze controllers for polling
