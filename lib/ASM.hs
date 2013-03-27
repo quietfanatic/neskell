@@ -1,5 +1,11 @@
 
-module ASM (ASM, byte, bytes, ascii, fill, hexdata, le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble, nothing, here, set_counter, assemble_asm, fitIntegral) where
+module ASM (
+    ASM,
+    byte, bytes, ascii, fill, hexdata,
+    le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
+    nothing, here, set_counter,
+    assemble_asm, no_overflow
+) where
 
 import Data.Word
 import Data.Bits
@@ -86,11 +92,11 @@ bedouble :: Double -> ASM ()
 bedouble = be32 . unsafeCoerce
 
 
-fitIntegral' :: (Integral a, Integral b) => b -> b -> a -> Maybe b
-fitIntegral' min max x = let
+no_overflow' :: (Integral a, Integral b) => b -> b -> a -> Maybe b
+no_overflow' min max x = let
     in if toInteger min <= toInteger x && toInteger x <= toInteger max
         then Just (fromIntegral x)
         else Nothing
 
-fitIntegral :: (Integral a, Integral b, Bounded b) => a -> Maybe b
-fitIntegral = fitIntegral' minBound maxBound
+no_overflow :: (Integral a, Integral b, Bounded b) => a -> Maybe b
+no_overflow = no_overflow' minBound maxBound

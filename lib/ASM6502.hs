@@ -16,7 +16,7 @@ high x = fromIntegral (B.shiftR (fromIntegral x :: Word16) 8)
 op8 :: (Integral x, Show x) => Word8 -> x -> ASM ()
 op8 a x = byte a >> Assembly f where
     f start = let
-        res = case fitIntegral x :: Maybe Word8 of
+        res = case no_overflow x :: Maybe Word8 of
             Just w8 -> S.singleton w8
             Nothing -> error$ "Overflow error in op8 (" ++ show x ++ ")"
         in (res, succ start, ())
@@ -24,9 +24,9 @@ op8 a x = byte a >> Assembly f where
 op16 :: (Integral x, Show x) => Word8 -> x -> ASM ()
 op16 a x = byte a >> Assembly f where
     f start = let
-        res16 = case fitIntegral x :: Maybe Word8 of
+        res16 = case no_overflow x :: Maybe Word8 of
             Just w8 -> fromIntegral w8
-            Nothing -> case fitIntegral x :: Maybe Word16 of
+            Nothing -> case no_overflow x :: Maybe Word16 of
                 Just w16 -> w16
                 Nothing -> error$ "Overflow error in op16 (" ++ show x ++ ")"
         res = S.singleton (fromIntegral res16) S.>< S.singleton (fromIntegral (B.shiftR res16 8))
@@ -35,9 +35,9 @@ op16 a x = byte a >> Assembly f where
  -- Unlike op8 and op16, this is strict regarding its argument, because the size of the
  -- resulting code depends on the argument.
 op8or16 :: (Integral x, Show x) => Word8 -> Word8 -> x -> ASM ()
-op8or16 a b x = case fitIntegral x of
+op8or16 a b x = case no_overflow x of
     Just w8 -> byte a >> byte w8
-    Nothing -> case fitIntegral x of
+    Nothing -> case no_overflow x of
         Just w16 -> byte b >> le16 w16
         Nothing -> fail$ "Overflow error in op8or16 (" ++ show x ++ ")"
 
@@ -45,7 +45,7 @@ rel8 :: Integral a => Word8 -> a -> ASM ()
 rel8 b x = byte b >> Assembly f where
     f start = let
         off = fromIntegral x - succ start
-        res = case fitIntegral off :: Maybe Int8 of
+        res = case no_overflow off :: Maybe Int8 of
             Just i8 -> S.singleton (fromIntegral i8)
             Nothing -> fail$ "Overflow error in relative calculation (" ++ show off ++ ")"
         in (res, succ start, ())
