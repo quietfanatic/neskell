@@ -11,7 +11,6 @@ import Debug.Trace
 
 main = do
     B.putStr $ NES.header 0x01 0x01 0x00 0x00
-    trace (show (B.length prgbank)) return ()
     B.putStr $ prgbank
     sprites <- B.readFile "controllertest/sprites.bin"
     B.putStr $ sprites
@@ -23,16 +22,9 @@ main = do
 
 (prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
-    begin <- here
-    trace ("prg_main @ " ++ show begin) nothing
     (nmi, reset, irq) <- prg_main
-    data_begin <- here
-    trace ("data @ " ++ show data_begin) nothing
-    data_section
-    data_end <- here
-    fill (0xfffa - data_end) 0xff
-    vecs <- here
-    trace ("vectors @ " ++ show vecs) nothing
+    data_begin <- startof data_section
+    fillto 0xfffa 0xff
     provide nmi_vector $ le16 (fromIntegral nmi)
     provide reset_vector $ le16 (fromIntegral reset)
     provide irq_vector $ le16 (fromIntegral irq)
@@ -229,17 +221,11 @@ prg_main = mdo
 
 data_section = mdo
 
-    l1 <- here
-    trace ("l1 " ++ show l1) nothing
-
     provide sprite_palettes $ hexdata$ ""
         ++ "2212020f"
         ++ "2a1a0a0f"
         ++ "2616060f"
         ++ "3010000f"
-
-    l2 <- here
-    trace ("l2 " ++ show l2) nothing
 
     provide background_palettes $ hexdata$ ""
         ++ "2212020f"

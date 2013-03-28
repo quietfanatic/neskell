@@ -3,7 +3,7 @@
 
 module ASM (
     ASM,
-    byte, bytes, ascii, bytestring, binfile, fill, pad, hex, hexdata,
+    byte, bytes, ascii, bytestring, binfile, fill, fillto, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
     assemble_asm, asm, no_overflow,
@@ -52,6 +52,14 @@ fill :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fill size b = if size >= 0
     then Assembly (\c -> (S.replicate (fromIntegral size) b, c + size, ()))
     else error$ "Tried to fill a block with negative size (did something assemble too large?)"
+
+fillto :: Integral ctr => ctr -> Word8 -> ASM ctr ()
+fillto end b = Assembly f where
+    f start = let
+        res = if start > end
+            then error$ "Tried to fillto with negative size (did something assemble too large?)"
+            else S.replicate (fromIntegral (end - start)) b
+        in (res, end, ())
 
 pad :: Integral ctr => ctr -> Word8 -> ASM ctr a -> ASM ctr a
 pad size = pad_assembly size . S.singleton
