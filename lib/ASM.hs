@@ -9,12 +9,13 @@ module ASM (
     assemble_asm, asm, no_overflow,
     startof, endof, sizeof,
     rep, repfor, skip, (>>.),
-    Res, start, size, end, resources, provide, provide_at, merge_res
+    Res, start, size, end, resources, provide, provide_at
 ) where
 
 import Data.Word
 import Data.Bits
 import Data.Char
+import Data.Monoid
 import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import qualified Data.ByteString as B
@@ -195,9 +196,9 @@ provide_at off res code = mdo
     enforce_counter (end res + off)
     return ret
 
-merge_res :: (Num a, Eq a) => [Res a] -> Res a
-merge_res = foldl1 merge2 where
-    merge2 a b = if end a == start b
+instance (Num a, Eq a) => Monoid (Res a) where
+    mempty = Res 0 0
+    mappend a b = if end a == start b
         then Res (start a) (size a + size b)
         else error$ "Tried to merge resources that didn't match."
 

@@ -7,6 +7,7 @@ import ASM6502
 import NES
 import Data.Word
 import Data.Bits ((.|.), shiftL)
+import Data.Monoid
 import Debug.Trace
 
 
@@ -216,6 +217,13 @@ nmi_section = mdo
     camera_y *->* ppu_scroll
     rti
 
+[sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
+ tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
+ [16, 16, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
+
+all_palettes :: Res6502
+all_palettes = sprite_palettes <> background_palettes
+
 data_section = mdo
 
     provide sprite_palettes $ hexdata$ ""
@@ -264,12 +272,5 @@ data_section = mdo
         ++ "01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01"
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
-
-[sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
- tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
- [16, 16, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
-
-all_palettes :: Res6502
-all_palettes = merge_res [sprite_palettes, background_palettes]
 
 
