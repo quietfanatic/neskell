@@ -31,8 +31,8 @@ pad_assembly size filling (Assembly code) = Assembly f where
                      ++ show (toInteger finish) ++ " - "
                      ++ show (toInteger start) ++ " > "
                      ++ show (toInteger size) ++ ")."
-            else coderes <> F.fold (replicate (fromIntegral (finish - (start + size))) filling)
-        in (res, max finish (start + size), ret)
+            else coderes <> F.fold (replicate (fromIntegral (start + size - finish)) filling)
+        in (res, start + size, ret)
 
 return_assembly :: Monoid mon => a -> Assembly mon ctr a
 return_assembly x = Assembly (\c -> (mempty, c, x))

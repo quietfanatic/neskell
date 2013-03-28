@@ -45,8 +45,8 @@ bytestring :: Num ctr => B.ByteString -> ASM ctr ()
 bytestring bs = Assembly (\c -> (S.fromList (B.unpack bs), fromIntegral (B.length bs), ()))
 
 {-# NOINLINE binfile #-}
-binfile :: Num ctr => String -> ASM ctr ()
-binfile = bytestring . unsafePerformIO . B.readFile
+binfile :: String -> B.ByteString
+binfile = unsafePerformIO . B.readFile
 
 fill :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fill size b = if size >= 0

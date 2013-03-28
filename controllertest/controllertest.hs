@@ -10,31 +10,32 @@ import Data.Bits ((.|.), shiftL)
 import Debug.Trace
 
 main = do
-    B.putStr code
+    B.putStr $ NES.header 0x01 0x01 0x00 0x00
+    trace (show (B.length prgbank)) return ()
+    B.putStr $ prgbank
+    sprites <- B.readFile "controllertest/sprites.bin"
+    B.putStr $ sprites
+    B.putStr $ B.replicate (0x1000 - B.length sprites) 0xff
+    background <- B.readFile "controllertest/background.bin"
+    B.putStr $ background
+    B.putStr $ B.replicate (0x1000 - B.length background) 0xff
 
-(code, _, data_begin) = asm 0 top
 
-top = mdo
-    NES.header 0x01 0x01 0x00 0x00
-    data_begin <- prgbank
-    chrbank "controllertest/sprites.bin"
-    chrbank "controllertest/background.bin"
-    return data_begin
-
-prgbank = mdo
+data_begin = 0xe000 - 6
+(prgbank, 0, _) = asm 0 $ mdo
     set_counter 0xc000
---    begin <- here
---    trace (show begin) nothing
-    (nmi, reset, irq, data_begin) <- pad (0x4000 - 6) 0xff prg_main
---    pos <- here
---    trace (show pos) nothing
+    begin <- here
+    trace ("prg_main @ " ++ show begin) nothing
+    (nmi, reset, irq) <- pad (0x2000 - 6) 0xff prg_main
+    data_begin <- here
+    trace ("data @ " ++ show data_begin) nothing
+    pad 0x2000 0xff data_section
+    vecs <- here
+    trace ("vectors @ " ++ show vecs) nothing
     provide nmi_vector $ le16 (fromIntegral nmi)
     provide reset_vector $ le16 (fromIntegral reset)
     provide irq_vector $ le16 (fromIntegral irq)
     return data_begin
-
-chrbank :: String -> ASM6502 ()
-chrbank = pad 0x1000 0xff . binfile
 
 bitlist :: [Word8]
 bitlist = map (shiftL 1) [0..]
@@ -223,7 +224,9 @@ prg_main = mdo
         camera_y *->* ppu_scroll
         rti
 
-    data_begin <- here
+    return (nmi, reset, 0)
+
+data_section = mdo
 
     provide sprite_palettes $ hexdata$ ""
         ++ "2212020f"
@@ -271,8 +274,6 @@ prg_main = mdo
         ++ "01 01 01 01 01 01 01 01 01 01 01 01 01 01 01 01"
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
-
-    return (nmi, reset, 0, data_begin)
 
 [sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
  tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin

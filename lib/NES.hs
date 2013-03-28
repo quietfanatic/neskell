@@ -4,18 +4,19 @@ import Data.Word
 import ASM
 import ASM6502 hiding (bit)
 import Data.Bits
+import Data.Char
+import qualified Data.ByteString as B
 
  -- Provides an ines header.
  --       prgs     chrs     mapper   flags
-header :: Word8 -> Word8 -> Word8 -> Word8 -> ASM6502 ()
-header prgs chrs mapper flags = do
-    ascii "NES"
-    byte 0x1a
-    byte prgs
-    byte chrs
-    byte (shiftL (mapper .&. 0xf) 4 .|. (flags .&. 0xf))
-    byte ((mapper .&. 0xf0) .|. shiftR (flags .&. 0xf0) 4)
-    fill 8 0
+header :: Word8 -> Word8 -> Word8 -> Word8 -> B.ByteString
+header prgs chrs mapper flags = let asc = fromIntegral . ord in B.pack [
+    asc 'N', asc 'E', asc 'S', 0x1a,
+    prgs, chrs,
+    shiftL (mapper .&. 0xf) 4 .|. (flags .&. 0xf),
+    (mapper .&. 0xf0) .|. shiftR (flags .&. 0xf0) 4,
+    0, 0, 0, 0, 0, 0, 0, 0
+        ]
 
  -- The names of various memory-mapped ports
 

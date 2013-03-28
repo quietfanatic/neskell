@@ -6,14 +6,12 @@ import ASM
 import ASM6502
 import NES
 
-main = B.putStr (assemble_asm top)
+main = do
+    B.putStr $ NES.header 0x01 0x01 0x00 0x00
+    B.putStr $ assemble_asm prgbank
+    B.putStr $ chrbank
 
-top = mdo
-    NES.header 0x01 0x01 0x00 0x00
-    prgbank
-    chrbank
-
-chrbank = fill 0x2000 0xff
+chrbank = B.replicate 0x2000 0xff
 
  -- bits representing the buttons
 button_a = 0x80
