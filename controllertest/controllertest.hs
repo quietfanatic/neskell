@@ -88,7 +88,7 @@ move_ball = mdo
     move btn_left  dec ball_x 0x40 bcs camera_x inc ball_screen_x
     move btn_right inc ball_x 0xc1 bcc camera_x dec ball_screen_x
     move btn_up    dec ball_y 0x40 bcs camera_y inc ball_screen_y
-    move btn_down  inc ball_y 0xc1 bcc camera_y dec ball_screen_y
+    move btn_down  inc ball_y 0xb1 bcc camera_y dec ball_screen_y
 
 
 draw_ball = do
