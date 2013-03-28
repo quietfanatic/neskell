@@ -9,21 +9,25 @@ import Data.Word
 import Data.Bits ((.|.), shiftL)
 
 main = do
-    B.putStr (assemble_asm top)
+    B.putStr code
+
+(code, _, data_begin) = asm 0 top
 
 top = mdo
     NES.header 0x01 0x01 0x00 0x00
-    prgbank
+    data_begin <- prgbank
     chrbank "controllertest/sprites.bin"
     chrbank "controllertest/background.bin"
+    return data_begin
 
 prgbank = mdo
     set_counter 0xc000
     begin <- here
-    (nmi, reset, irq) <- pad (0x4000 - 6) 0xff prg_main
+    (nmi, reset, irq, data_begin) <- pad (0x4000 - 6) 0xff prg_main
     le16 (fromIntegral nmi)
     le16 (fromIntegral reset)
     le16 (fromIntegral irq)
+    return data_begin
 
 chrbank :: String -> ASM6502 ()
 chrbank = pad 0x1000 0xff . binfile
@@ -133,7 +137,7 @@ prg_main = mdo
         0x3f ->* ppu_address
         0x00 ->* ppu_address
         repfor (ldyi 0x1f) (dey >>. bpl) $ mdo
-            lday sprite_palettes
+            lday (start sprite_palettes)
             sta ppu_mem
          -- Draw background
         lda ppu_status
@@ -210,7 +214,9 @@ prg_main = mdo
         camera_y *->* ppu_scroll
         rti
 
-    sprite_palettes <- startof$ hexdata$ ""
+    data_begin <- here
+
+    provide sprite_palettes$ hexdata$ ""
         ++ "2212020f"
         ++ "2a1a0a0f"
         ++ "2616060f"
@@ -257,5 +263,11 @@ prg_main = mdo
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
 
-    return (nmi, reset, 0)
+    return (nmi, reset, 0, data_begin)
+
+[sprite_palettes, background_palletes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
+ tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
+ [16, 16, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
+  
+
 

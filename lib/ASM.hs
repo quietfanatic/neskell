@@ -6,9 +6,10 @@ module ASM (
     byte, bytes, ascii, bytestring, binfile, fill, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
-    assemble_asm, no_overflow,
+    assemble_asm, asm, no_overflow,
     startof, endof, sizeof,
-    rep, repfor, skip, (>>.)
+    rep, repfor, skip, (>>.),
+    Res, start, size, end, resources, provide, provide_at, merge_res
 ) where
 
 import Data.Word
@@ -25,6 +26,11 @@ type ASM ctr a = Assembly (S.Seq Word8) ctr a
 
 assemble_asm :: Num ctr => ASM ctr a -> B.ByteString
 assemble_asm = B.pack . F.toList . assemble
+
+asm :: Num ctr => ctr -> ASM ctr a -> (B.ByteString, ctr, a)
+asm start (Assembly f) = let
+    (seq, finish, ret) = f start
+    in (B.pack (F.toList seq), finish, ret)
 
 byte :: Enum ctr => Word8 -> ASM ctr ()
 byte = unit . S.singleton
@@ -156,3 +162,34 @@ skip branch code = mdo
 
 infixl 1 >>. 
 cmp >>. branch = (cmp >>) . branch
+
+
+data Res a = Res a a
+start (Res x _) = x
+size (Res _ x) = x
+end (Res start size) = start + size
+
+resources :: Num a => a -> [a] -> [Res a]
+resources start [] = []
+resources start (size:sizes) = Res start size : resources (start + size) sizes
+
+provide :: (Num ctr, Eq ctr, Show ctr) => Res ctr -> ASM ctr a -> ASM ctr a
+provide res code = mdo
+    enforce_counter (start res)
+    ret <- code
+    enforce_counter (end res)
+    return ret
+
+provide_at :: (Num ctr, Eq ctr, Show ctr) => ctr -> Res ctr -> ASM ctr a -> ASM ctr a
+provide_at off res code = mdo
+    enforce_counter (start res + off)
+    ret <- code
+    enforce_counter (end res + off)
+    return ret
+
+merge_res :: (Num a, Eq a) => [Res a] -> Res a
+merge_res = foldl1 merge2 where
+    merge2 a b = if end a == start b
+        then Res (start a) (end b)
+        else error$ "Tried to merge resources that didn't match."
+

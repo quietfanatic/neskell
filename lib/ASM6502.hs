@@ -518,3 +518,7 @@ a *->* b = lda a >> sta b
 mem *<- val = ldai val >> sta mem
 (*<-*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
 b *<-* a = lda a >> sta b
+
+type Res6502 = Res Word16
+res6502 :: Word16 -> [Word16] -> [Res6502]
+res6502 = resources

@@ -1,5 +1,5 @@
 
-module Assembly (Assembly(..), assemble, nothing, here, unit, units, pad_assembly, return_assembly, fail_assembly, append_assembly, bind_assembly, set_counter) where
+module Assembly (Assembly(..), assemble, nothing, here, unit, units, pad_assembly, return_assembly, fail_assembly, append_assembly, bind_assembly, set_counter, enforce_counter) where
 
 import Data.Monoid
 import qualified Data.Foldable as F
@@ -67,6 +67,12 @@ fix_assembly f = Assembly g where
 
 set_counter :: (Monoid mon) => ctr -> Assembly mon ctr ()
 set_counter new = Assembly (\_ -> (mempty, new, ()))
+
+enforce_counter :: (Monoid mon, Show ctr, Num ctr, Eq ctr) => ctr -> Assembly mon ctr ()
+enforce_counter expected = Assembly f where
+    f got = if got == expected
+        then (mempty, got, ())
+        else (error ("Something was misaligned (counter was " ++ show got ++ " instead of " ++ show expected ++ ")"), got, ())
 
 instance (Monoid mon, Show ctr) => Monad (Assembly mon ctr) where
     return = return_assembly
