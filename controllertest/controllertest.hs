@@ -20,26 +20,28 @@ main = do
     B.putStr $ background
     B.putStr $ B.replicate (0x1000 - B.length background) 0xff
 
-
-bitlist :: [Word8]
-bitlist = map (shiftL 1) [0..]
-[btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] = take 8 bitlist
-
  -- Keeps track of how many sprites have been drawn so far.
  -- Only valid during drawing phase.
 sprites_left = 0x0f
 
+ -- ZERO PAGE ALLOCATIONS
  -- Let's have a ball that's moved by the arrow keys.
  -- That's original, right?
 
 ball_x : ball_y :
  camera_x : camera_y :
- _ = [0x10 .. 0xff] :: [Word8]
+ _ = [0x10..0xff] :: [Word8]
+
+ -- MAIN MEMORY ALLOCATIONS
+
+save_ppu_ctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
+
+ -- UTILITY VALUES
+
+btn_right:btn_left:btn_down:btn_up:btn_start:btn_select:btn_b:btn_a:_ = map (shiftL 1) [0..] :: [Word8]
 
 xcoord = 0x00
 ycoord = 0x01
-
-save_ppu_ctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
 
 (prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
@@ -57,9 +59,6 @@ init_ball = mdo
     ldai 0x80
     sta ball_x
     sta ball_y
---    ldai 0x00
---    sta bg_x
---    sta bg_y
 
 move_ball = mdo
     let bump GT = inc
