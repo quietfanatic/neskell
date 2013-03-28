@@ -21,23 +21,23 @@ header prgs chrs mapper flags = let asc = fromIntegral . ord in B.pack [
  -- The names of various memory-mapped ports
 
 ppu_ctrl = 0x2000 :: Word16
-ppu_nametable_x = bit 0 :: Word8
-ppu_nametable_y = bit 1 :: Word8
-ppu_inc_32 = bit 2 :: Word8
-ppu_sprites_1000 = bit 3 :: Word8
-ppu_background_1000 = bit 4 :: Word8
-ppu_sprites_8x16 = bit 5 :: Word8
-ppu_enable_nmi = bit 7 :: Word8
+nametable_x_bit = bit 0 :: Word8
+nametable_y_bit = bit 1 :: Word8
+inc_32_bit = bit 2 :: Word8
+sprites_1000_bit = bit 3 :: Word8
+background_1000_bit = bit 4 :: Word8
+sprites_8x16_bit = bit 5 :: Word8
+enable_nmi_bit = bit 7 :: Word8
 
 ppu_mask = 0x2001 :: Word16
-ppu_grayscale = bit 0 :: Word8
-ppu_dont_clip_background = bit 1 :: Word8
-ppu_dont_clip_sprites = bit 2 :: Word8
-ppu_enable_background = bit 3 :: Word8
-ppu_enable_sprites = bit 4 :: Word8
-ppu_intensify_red = bit 5 :: Word8
-ppu_intensify_green = bit 6 :: Word8
-ppu_intensify_blue = bit 7 :: Word8
+grayscale_bit = bit 0 :: Word8
+dont_clip_background_bit = bit 1 :: Word8
+dont_clip_sprites_bit = bit 2 :: Word8
+enable_background_bit = bit 3 :: Word8
+enable_sprites_bit = bit 4 :: Word8
+intensify_red_bit = bit 5 :: Word8
+intensify_green_bit = bit 6 :: Word8
+intensify_blue_bit = bit 7 :: Word8
 
 ppu_status = 0x2002 :: Word16
 spr_address = 0x2003 :: Word16

@@ -83,21 +83,21 @@ move_ball = mdo
     move btn_left xcoord LT 0x40 $ do
         dec camera_x
         skip (lda camera_x >> cmpi 0xff >>. bne) $ do
-            ppu_nametable_x -^>* save_ppu_ctrl
+            NES.nametable_x_bit -^>* save_ppu_ctrl
     move btn_right xcoord GT 0xc1 $ do
         inc camera_x
         skip bne $ do
-            ppu_nametable_x -^>* save_ppu_ctrl
+            NES.nametable_x_bit -^>* save_ppu_ctrl
     move btn_up ycoord LT 0x40 $ do
         dec camera_y
         skip (lda camera_y >> cmpi 0xff >>. bne) $ do
             0xef ->* camera_y
-            ppu_nametable_y -^>* save_ppu_ctrl
+            NES.nametable_y_bit -^>* save_ppu_ctrl
     move btn_down ycoord GT 0xb1 $ do
         inc camera_y
         skip (lda camera_y >> cmpi 0xf0 >>. bne) $ do
             0x00 ->* camera_y
-            ppu_nametable_y -^>* save_ppu_ctrl
+            NES.nametable_y_bit -^>* save_ppu_ctrl
 
 
 draw_ball = do
@@ -172,10 +172,10 @@ reset_section = mdo
     repfor (ldyi 0x40) (dey >>. bne) $ mdo
         sta ppu_mem
      -- enable rendering
-    save_ppu_ctrl *<- ppu_enable_nmi .|. ppu_background_1000
+    save_ppu_ctrl *<- enable_nmi_bit .|. background_1000_bit
     sta ppu_ctrl
-    ppu_mask *<- ppu_dont_clip_background .|. ppu_dont_clip_sprites
-             .|. ppu_enable_background .|. ppu_enable_sprites
+    ppu_mask *<- dont_clip_background_bit .|. dont_clip_sprites_bit
+             .|. enable_background_bit .|. enable_sprites_bit
     
     init_ball
      -- Done with everything

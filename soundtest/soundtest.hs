@@ -38,7 +38,7 @@ reset_section = mdo
     0x0f ->* NES.ppu_mem
 
      -- nmi for the sound
-    NES.ppu_ctrl *<- NES.ppu_enable_nmi
+    NES.ppu_ctrl *<- NES.enable_nmi_bit
     NES.ppu_mask *<- 0
 
      -- enable sound
