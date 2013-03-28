@@ -145,7 +145,7 @@ prg_main = mdo
         lda ppu_status
         0x3f ->* ppu_address
         0x00 ->* ppu_address
-        repfor (ldyi (size all_palettes - 1)) (dey >>. bpl) $ mdo
+        fordeyin all_palettes $ mdo
             lday all_palettes
             sta ppu_mem
          -- Draw background

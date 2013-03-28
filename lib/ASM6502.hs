@@ -505,6 +505,13 @@ txs = byte 0x9a
 tya :: ASM6502 ()
 tya = byte 0x98
 
+ -- Nice shortcuts
+
+forinxin res = repfor (ldxi 0x00) (inx >> cpxi (size res) >>. bne)
+forinyin res = repfor (ldyi 0x00) (iny >> cpyi (size res) >>. bne)
+ -- NOTE: These can only work for resources of size <= 0x80
+fordexin res = repfor (ldxi (size res - 1)) (dex >>. bpl)
+fordeyin res = repfor (ldyi (size res - 1)) (dey >>. bpl)
 
 infix 2 ->*
 infix 2 *<-
@@ -522,3 +529,4 @@ b *<-* a = lda a >> sta b
 type Res6502 = Res Word16
 res6502 :: Word16 -> [Word16] -> [Res6502]
 res6502 = resources
+
