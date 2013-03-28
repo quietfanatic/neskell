@@ -38,7 +38,9 @@ save_ppu_ctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
 
  -- UTILITY VALUES
 
-btn_right:btn_left:btn_down:btn_up:btn_start:btn_select:btn_b:btn_a:_ = map (shiftL 1) [0..] :: [Word8]
+btn_right : btn_left : btn_down : btn_up :
+ btn_start : btn_select : btn_b : btn_a :
+ _ = map (shiftL 1) [0..] :: [Word8]
 
 xcoord = 0x00
 ycoord = 0x01
@@ -47,12 +49,11 @@ ycoord = 0x01
     set_counter 0xc000
     reset <- startof reset_section
     nmi <- startof nmi_section
-    let irq = 0
     data_begin <- startof data_section
     fillto 0xfffa 0xff
-    provide nmi_vector $ le16 (fromIntegral nmi)
-    provide reset_vector $ le16 (fromIntegral reset)
-    provide irq_vector $ le16 (fromIntegral irq)
+    provide nmi_vector $ le16 nmi
+    provide reset_vector $ le16 reset
+    provide irq_vector $ le16 0
     return data_begin
 
 init_ball = mdo
