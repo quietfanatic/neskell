@@ -8,14 +8,11 @@ import ASM
 import ASM6502
 import NES
 import Debug.Trace
+import qualified NES.ASoundEngine as S
 
 main = do
     B.putStr $ NES.header 0x01 0x00 0x00 0x00
     B.putStr $ prgbank
-
-channel_program = (+ 0)
-channel_pos = (+ 2)
-channel_timer = (+ 4)
 
 square1_state = 0x90
 square2_state = 0x98
@@ -30,61 +27,6 @@ square2_state = 0x98
     provide reset_vector $ le16 reset
     provide irq_vector $ le16 0
     return data_begin
-
-init_sound_engine ch program = mdo
-    low program ->* (channel_program ch)
-    high program ->* (channel_program ch) + 1
-    0x00 ->* channel_pos ch
-    0x04 ->* channel_timer ch
-
-sound_engine nesch ch note_table default_env = mdo
-    let timer = channel_timer ch
-        pos = channel_pos ch
-        program = channel_program ch
-        env = NES.channel_env nesch
-        low = NES.channel_low nesch
-        high = NES.channel_high nesch
-    dec timer
-    skip bne $ mdo
-        read_note <- here
-        ldy pos
-        ldayp program
-        beq special
-        sta timer
-        iny
-        ldayp program
-        beq rest
-        tone <- startof$ mdo
-            asla
-            tax
-            ldax note_table
-            sta low
-            ldax (start note_table + 1)
-            sta high
-            default_env ->* env  -- 00110011
-            iny
-            jmp done_sound
-        rest <- startof$ mdo
-            0x30 ->* env  -- 00110000
-            iny
-            jmp done_sound
-        special <- startof$ mdo
-            iny
-            ldayp program
-            beq repeat
-            unknown <- startof$ mdo
-                iny
-                jmp done_special
-            repeat <- startof$ mdo
-                iny
-                sta pos
-                jmp done_special
-            done_special <- startof$ mdo
-                jmp read_note
-            nothing
-        done_sound <- here
-        sty pos
-
 reset_section = mdo
     initialize
 
@@ -99,20 +41,18 @@ reset_section = mdo
     ppu_mask *<- 0
 
      -- enable sound
-    0x30 ->* square1_env  -- 00110000
-    0x30 ->* square2_env  -- 00110000
     0x03 ->* apu_flags  -- 00000011
 
-    init_sound_engine square1_state square1_program
-    init_sound_engine square2_state square2_program
+    S.init_sound_engine NES.square1 square1_state square1_program 0x30
+    S.init_sound_engine NES.square2 square2_state square2_program 0x30
 
     idle <- here
     jmp idle
 
 nmi_section = mdo
 
-    sound_engine NES.square1 square1_state note_table 0x33
-    sound_engine NES.square2 square2_state note_table 0x32
+    S.sound_engine NES.square1 square1_state note_table 0x33
+    S.sound_engine NES.square2 square2_state note_table 0x32
 
     rti
 
@@ -131,15 +71,15 @@ note_table' = [                                                             0x07
     0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4b-0x56)
     0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16]                             -- c9-f#9 (0x57-0x5d)
 
-square1_program' = hex $ ""
-    ++ "401f 4021 4022 4026 4024 2022 2021 1c1f 0400 101f 101d 341a 0c00"
-    ++ "401f 4022 4021 401d 541f 0c00 2026 6424 1c00"
-    ++ "0000"
+square1_program' = []
+    ++ hex "401f 4021 4022 4026 4024 2022 2021 1c1f 0400 101f 101d 341a 0c00"
+    ++ hex "401f 4022 4021 401d 541f 0c00 2026 6424 1c00"
+    ++ S.repeat
 
-square2_program' = hex $ ""
-    ++ "8013 8011 400f 4011 8013"
-    ++ "800f 8011 8013 8011"
-    ++ "0000"
+square2_program' = []
+    ++ hex "8013 8011 400f 4011 8013"
+    ++ hex "800f 8011 8013 8011"
+    ++ S.repeat
 
 data_section = mdo
     provide note_table $ sequence $ map le16 $ note_table'
