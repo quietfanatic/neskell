@@ -9,7 +9,8 @@ module ASM (
     assemble_asm, asm, no_overflow,
     startof, endof, sizeof,
     rep, repfor, skip, (>>.),
-    Res, start, size, end, resources, provide, provide_at
+    Allocation, start, size, end, provide, provide_at,
+    allocate8, allocate16, allocate32, allocate64
 ) where
 
 import Data.Word
@@ -173,59 +174,72 @@ infixl 1 >>.
 cmp >>. branch = (cmp >>) . branch
 
 
-data Res a = Res a a deriving (Show, Eq, Ord)
-start (Res x _) = x
-size (Res _ x) = x
-end (Res start size) = start + size
+data Allocation a = Allocation a a deriving (Show, Eq, Ord)
+start (Allocation x _) = x
+size (Allocation _ x) = x
+end (Allocation start size) = start + size
 
-resources :: (Num a, Integral b) => a -> [b] -> [Res a]
-resources start [] = []
-resources start (size:sizes) = Res start isize : resources (start + isize) sizes where
+allocate :: (Num a, Integral b) => a -> [b] -> [Allocation a]
+allocate start [] = []
+allocate start (size:sizes) = Allocation start isize : allocate (start + isize) sizes where
     isize = fromIntegral size
 
-provide :: (Num ctr, Eq ctr, Show ctr) => Res ctr -> ASM ctr a -> ASM ctr a
+type Allocation8 = Allocation Word8
+allocate8 :: Integral a => Word8 -> [a] -> [Allocation8]
+allocate8 = allocate
+type Allocation16 = Allocation Word16
+allocate16 :: Integral a => Word16 -> [a] -> [Allocation16]
+allocate16 = allocate
+type Allocation32 = Allocation Word32
+allocate32 :: Integral a => Word32 -> [a] -> [Allocation32]
+allocate32 = allocate
+type Allocation64 = Allocation Word64
+allocate64 :: Integral a => Word64 -> [a] -> [Allocation64]
+allocate64 = allocate
+
+provide :: (Num ctr, Eq ctr, Show ctr) => Allocation ctr -> ASM ctr a -> ASM ctr a
 provide res code = mdo
     enforce_counter (start res)
     ret <- code
     enforce_counter (end res)
     return ret
 
-provide_at :: (Num ctr, Eq ctr, Show ctr) => ctr -> Res ctr -> ASM ctr a -> ASM ctr a
+provide_at :: (Num ctr, Eq ctr, Show ctr) => ctr -> Allocation ctr -> ASM ctr a -> ASM ctr a
 provide_at off res code = mdo
     enforce_counter (start res + off)
     ret <- code
     enforce_counter (end res + off)
     return ret
 
-instance (Num a, Eq a) => Monoid (Res a) where
-    mempty = Res 0 0
+instance (Num a, Eq a) => Monoid (Allocation a) where
+    mempty = Allocation 0 0
     mappend a b = if end a == start b
-        then Res (start a) (size a + size b)
+        then Allocation (start a) (size a + size b)
         else error$ "Tried to merge resources that didn't match."
 
-instance Num a => Num (Res a) where
-    (+) = error$ "Can't (+) Res."
-    (*) = error$ "Can't (*) Res."
-    (-) = error$ "Can't (-) Res."
-    abs = error$ "Can't abs Res."
-    signum = error$ "Can't signum Res."
-    fromInteger x = Res (fromInteger x) 0
+instance Num a => Num (Allocation a) where
+    (+) = error$ "Can't (+) Allocation."
+    (*) = error$ "Can't (*) Allocation."
+    (-) = error$ "Can't (-) Allocation."
+    abs = error$ "Can't abs Allocation."
+    signum = error$ "Can't signum Allocation."
+    fromInteger x = Allocation (fromInteger x) 0
 
-instance Enum a => Enum (Res a) where
-    succ (Res st sz) = Res (succ st) sz
-    pred (Res st sz) = Res (pred st) sz
-    toEnum = error$ "Can't toEnum to get Res."
-    fromEnum = error$ "Can't fromEnum Res (you can toInteger it though."
+instance Enum a => Enum (Allocation a) where
+    succ (Allocation st sz) = Allocation (succ st) sz
+    pred (Allocation st sz) = Allocation (pred st) sz
+    toEnum = error$ "Can't toEnum to get Allocation."
+    fromEnum = error$ "Can't fromEnum Allocation (you can toInteger it though."
 
-instance Real a => Real (Res a) where
+instance Real a => Real (Allocation a) where
     toRational = toRational . start
 
-instance Integral a => Integral (Res a) where
-    quotRem = error$ "Can't quotRem Res.  It's only Integral for its toInteger."
-    toInteger (Res s _) = toInteger s
+instance Integral a => Integral (Allocation a) where
+    quotRem = error$ "Can't quotRem Allocation.  It's only Integral for its toInteger."
+    toInteger (Allocation s _) = toInteger s
 
  -- Kinda icky but okay
-instance Bounded a => Bounded (Res a) where
-    minBound = Res minBound minBound
-    maxBound = Res maxBound maxBound
+instance Bounded a => Bounded (Allocation a) where
+    minBound = Allocation minBound minBound
+    maxBound = Allocation maxBound maxBound
 

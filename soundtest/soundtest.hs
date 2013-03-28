@@ -42,7 +42,9 @@ reset_section = mdo
      -- enable sound
     0x03 ->* NES.apuctrl  -- 00000011
 
-    S.init_sound_engine sndstate square1_program square2_program 0x30
+    S.init_sound_engine sndstate 0x30
+    S.set_program sndstate S.square1 square1_program
+    S.set_program sndstate S.square2 square2_program
 
     idle <- here
     jmp idle
@@ -54,7 +56,7 @@ nmi_section = mdo
     rti
 
 [note_table, square1_program, square2_program]
-    = res6502 data_begin [2 * 0x5e, length square1_program', length square2_program']
+    = allocate16 data_begin [2 * 0x5e, length square1_program', length square2_program']
 
  -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
  -- but a couple tweaks may have been made to sharpen notes up a little

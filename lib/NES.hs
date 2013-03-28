@@ -123,5 +123,5 @@ initialize_end = do
 initialize_custom_clear clear = initialize_begin >> clear >> initialize_end
 initialize = initialize_custom_clear clear_memory
 
-[nmi, reset, irq] = res6502 0xfffa [2, 2, 2]
+[nmi, reset, irq] = allocate16 0xfffa [2, 2, 2]
 

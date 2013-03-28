@@ -602,7 +602,4 @@ from *-->* to = lda to >> sub from >> sta to
 (*<--*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
 (*<--*) = flip (*-->*)
 
-type Res6502 = Res Word16
-res6502 :: Integral a => Word16 -> [a] -> [Res6502]
-res6502 = resources
 

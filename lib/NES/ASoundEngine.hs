@@ -3,6 +3,7 @@
 
 module NES.ASoundEngine where
 
+import Data.Word
 import ASM
 import ASM6502
 import NES
@@ -11,19 +12,23 @@ chn_program = (+ 0)
 chn_pos = (+ 2)
 chn_timer = (+ 4)
 
+square1 = 0x00
+square2 = 0x08
+
 sndstate_square1 = (+ 0)
 sndstate_square2 = (+ 8)
 
-init_sound_engine sndstate program1 program2 default_env = mdo
-    let init_part nesch ch program = do
-        low program ->* (chn_program ch)
-        high program ->* (chn_program ch) + 1
+init_sound_engine sndstate default_env = mdo
+    let init_part nesch ch = do
         0x00 ->* chn_pos ch
         0x04 ->* chn_timer ch
         default_env ->* channel_env nesch
-    init_part NES.pulse1 (sndstate_square1 sndstate) program1
-    init_part NES.pulse2 (sndstate_square2 sndstate) program2
-    
+    init_part NES.pulse1 (sndstate_square1 sndstate)
+    init_part NES.pulse2 (sndstate_square2 sndstate)
+
+set_program sndstate chn prog = do
+    low prog ->* sndstate + chn
+    high prog ->* sndstate + chn + 1
 
 sound_engine sndstate note_table = mdo
     let run_part nesch ch default_env = mdo
