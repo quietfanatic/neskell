@@ -70,9 +70,11 @@ set_counter new = Assembly (\_ -> (mempty, new, ()))
 
 enforce_counter :: (Monoid mon, Show ctr, Num ctr, Eq ctr) => ctr -> Assembly mon ctr ()
 enforce_counter expected = Assembly f where
-    f got = if got == expected
-        then (mempty, got, ())
-        else (error ("Something was misaligned (counter was " ++ show got ++ " instead of " ++ show expected ++ ")"), got, ())
+    f got = let
+        res = if got == expected
+            then mempty
+            else error$ "Something was misaligned (counter was " ++ show got ++ " instead of " ++ show expected ++ ")"
+        in (res, expected, ())
 
 instance (Monoid mon, Show ctr) => Monad (Assembly mon ctr) where
     return = return_assembly

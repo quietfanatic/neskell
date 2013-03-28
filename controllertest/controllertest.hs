@@ -21,15 +21,16 @@ main = do
     B.putStr $ B.replicate (0x1000 - B.length background) 0xff
 
 
-data_begin = 0xe000 - 6
-(prgbank, 0, _) = asm 0 $ mdo
+(prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
     begin <- here
     trace ("prg_main @ " ++ show begin) nothing
-    (nmi, reset, irq) <- pad (0x2000 - 6) 0xff prg_main
+    (nmi, reset, irq) <- prg_main
     data_begin <- here
     trace ("data @ " ++ show data_begin) nothing
-    pad 0x2000 0xff data_section
+    data_section
+    data_end <- here
+    fill (0xfffa - data_end) 0xff
     vecs <- here
     trace ("vectors @ " ++ show vecs) nothing
     provide nmi_vector $ le16 (fromIntegral nmi)
@@ -228,11 +229,17 @@ prg_main = mdo
 
 data_section = mdo
 
+    l1 <- here
+    trace ("l1 " ++ show l1) nothing
+
     provide sprite_palettes $ hexdata$ ""
         ++ "2212020f"
         ++ "2a1a0a0f"
         ++ "2616060f"
         ++ "3010000f"
+
+    l2 <- here
+    trace ("l2 " ++ show l2) nothing
 
     provide background_palettes $ hexdata$ ""
         ++ "2212020f"
