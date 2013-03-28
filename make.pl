@@ -17,7 +17,7 @@ workflow {
     sub module {
         my ($name) = @_;
         rule dotexe($name), doths($name), sub {
-            system 'ghc', '-ilib', '-fno-warn-deprecated-flags', _hs($name), '-o', _exe($name);
+            system 'ghc', '-ilib', '-fno-warn-deprecated-flags', doths($name), '-o', dotexe($name);
         };
         rule dotnes($name), dotexe($name), sub {
             system(dotexe($name) . ' > ' . dotnes($name));
