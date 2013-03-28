@@ -99,24 +99,25 @@ move_ball = mdo
             0x00 ->* camera_y
             NES.nametable_y_bit -^>* save_ppu_ctrl
 
-
-draw_ball = do
-    let part yexpr tile attr xexpr = mdo
-            lda ball_y
-            sub camera_y
-            yexpr
-            sta NES.spr_mem
-            tile ->* NES.spr_mem
-            attr ->* NES.spr_mem
-            lda ball_x
-            sub camera_x
-            xexpr
-            sta NES.spr_mem
-            dec sprites_left
-    part nothing 0x05 0x01 nothing
-    part (addi 8) 0x06 0x01 nothing
-    part nothing 0x05 0x41 (addi 8)
-    part (addi 8) 0x06 0x41 (addi 8)
+draw_model :: Res6502 -> ASM6502 ()
+draw_model model = do
+    fordeyin model $ do
+        lday model
+        add ball_y
+        sub camera_y
+        sta NES.spr_mem
+        dey
+        lday model
+        sta NES.spr_mem
+        dey
+        lday model
+        sta NES.spr_mem
+        dey
+        lday model
+        add ball_x
+        sub camera_x
+        sta NES.spr_mem
+        dec sprites_left
 
  -- Main code stuff
 
@@ -198,7 +199,7 @@ nmi_section = mdo
         dec sprites_left
      -- Draw the ball
     move_ball
-    draw_ball
+    draw_model ball_model
      -- Stow away any unused sprites
     ldai 0xfe
     rep (dec sprites_left >>. bne) $ mdo
@@ -213,9 +214,9 @@ nmi_section = mdo
     camera_y *->* NES.ppu_scroll
     rti
 
-[sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
+[sprite_palettes, background_palettes, ball_model, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
  tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
- [16, 16, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
+ [16, 16, 4 * 4, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
 
 all_palettes :: Res6502
 all_palettes = sprite_palettes <> background_palettes
@@ -234,14 +235,16 @@ data_section = mdo
         ++ "2616060f"
         ++ "3010000f"
 
-    provide btnspr_x $ hexdata$
-        "d0 bf c8 c8 e0 d8 e8 f0"
-    provide btnspr_y $ hexdata$
-        "d0 d0 d8 c8 d0 d0 d0 d0"
-    provide btnspr_tile $ hexdata$
-        "01 01 00 00 03 03 02 02"
-    provide btnspr_attr $ hexdata$
-        "40 00 80 00 00 00 01 01"
+    provide ball_model $ hexdata$ ""
+        ++ "08 41 06 08"
+        ++ "08 41 05 00"
+        ++ "00 01 06 08"
+        ++ "00 01 05 00"
+
+    provide btnspr_x $ hexdata "d0 bf c8 c8 e0 d8 e8 f0"
+    provide btnspr_y $ hexdata "d0 d0 d8 c8 d0 d0 d0 d0"
+    provide btnspr_tile $ hexdata "01 01 00 00 03 03 02 02"
+    provide btnspr_attr $ hexdata "40 00 80 00 00 00 01 01"
 
     provide tiles_tl $ hexdata$
         "00 01 02 01 04 06 06"
