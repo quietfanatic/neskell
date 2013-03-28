@@ -135,16 +135,12 @@ read_controllers = mdo
 reset_section = mdo
     NES.initialize
      -- Load all the palettes
-    lda NES.ppu_status
-    0x3f ->* NES.ppu_address
-    0x00 ->* NES.ppu_address
+    NES.set_ppu_address 0x3f00
     fordeyin all_palettes $ mdo
         lday all_palettes
         sta NES.ppu_mem
      -- Draw background
-    lda NES.ppu_status
-    0x20 ->* NES.ppu_address
-    0x00 ->* NES.ppu_address
+    NES.set_ppu_address 0x2000
      -- name table
     repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
         let col = 0x00
