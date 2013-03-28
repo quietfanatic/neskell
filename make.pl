@@ -5,8 +5,6 @@ use warnings;
 use FindBin;
 BEGIN { %make:: or do { require "$FindBin::Bin/tool/make.pm"; make->import(':all') } }
 use autodie qw(:all);
-use File::Path qw<remove_tree>;
-use File::Spec::Functions qw(:ALL);
 
 my $here;
 
