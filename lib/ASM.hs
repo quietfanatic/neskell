@@ -9,8 +9,8 @@ module ASM (
     assemble_asm, asm, no_overflow,
     startof, endof, sizeof,
     rep, repfor, skip, (>>.),
-    Allocation, start, size, end, provide, provide_at,
-    allocate8, allocate16, allocate32, allocate64
+    Allocation(..), start, size, end, provide, provide_at,
+    allocate, allocate8, allocate16, allocate32, allocate64
 ) where
 
 import Data.Word

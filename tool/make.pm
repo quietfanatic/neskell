@@ -394,7 +394,7 @@ sub run_workflow {
     }
     my @program = eval { plan_workflow(@args) };
     if ($@) {
-        warn $@ unless $@ eq "\n";
+        warn $@ unless "$@" eq "\n";
         say "\e[31m✗\e[0m Nothing was done due to error.";
         return 0;
     }
@@ -408,7 +408,7 @@ sub run_workflow {
         status "⚙ ", show_rule($rule);
         eval { $rule->{recipe}->($rule->{to}, $rule->{from}) };
         if ($@) {
-            warn $@;
+            warn $@ unless "$@" eq "\n";
             say "\e[31m✗\e[0m Did not finish due to error.";
             Cwd::chdir $old_cwd;
             return 0;

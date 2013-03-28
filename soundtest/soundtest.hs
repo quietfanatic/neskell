@@ -15,7 +15,7 @@ main = do
     B.putStr $ prgbank
 
 
-sndstate = 0x90
+[sound] = allocate 0x90 [S.datasize]
 
 (prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
@@ -42,16 +42,16 @@ reset_section = mdo
      -- enable sound
     0x03 ->* NES.apuctrl  -- 00000011
 
-    S.init_sound_engine sndstate 0x30
-    S.set_program sndstate S.square1 square1_program
-    S.set_program sndstate S.square2 square2_program
+    S.init sound 0x30
+    S.set_program sound S.square1 square1_program
+    S.set_program sound S.square2 square2_program
 
     idle <- here
     jmp idle
 
 nmi_section = mdo
 
-    S.sound_engine sndstate note_table
+    S.run sound note_table
 
     rti
 
