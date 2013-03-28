@@ -55,7 +55,6 @@ sprites_left = 0x0f
 
 ball_x : ball_y :
  camera_x : camera_y :
- ball_screen_x : ball_screen_y :
  _ = [0x10 .. 0xff] :: [Word8]
 
 xcoord = 0x00
@@ -69,8 +68,6 @@ init_ball = mdo
     ldai 0x80
     sta ball_x
     sta ball_y
-    sta ball_screen_x
-    sta ball_screen_y
 --    ldai 0x00
 --    sta bg_x
 --    sta bg_y
@@ -82,39 +79,55 @@ move_ball = mdo
         unbump LT = inc
         branch GT = bcc
         branch LT = bcs
-        noflip GT _ = bne
-        noflip LT cam = lda cam >> cmpi 0xff >>. bne
             
-        move bit coord dir thr = mdo
+        move bit coord dir thr move_camera = mdo
             lda input1
             andi bit
             skip beq $ do
                 bump dir (ball_x + coord)
                 lda (ball_x + coord)
                 sub (camera_x + coord)
-                sta (ball_screen_x + coord)
                 cmpi thr
-                skip (branch dir) $ do
-                    bump dir (camera_x + coord)
-                    skip (noflip dir (camera_x + coord)) $ do
-                        ldai (coord + 1)
-                        eor save_ppu_ctrl
-                        sta save_ppu_ctrl
-                    unbump dir (ball_screen_x + coord)
-    move btn_left  xcoord LT 0x40
-    move btn_right xcoord GT 0xc1
-    move btn_up    ycoord LT 0x40
-    move btn_down  ycoord GT 0xb1
+                skip (branch dir) move_camera
+
+    move btn_left xcoord LT 0x40 $ do
+        dec camera_x
+        skip (lda camera_x >> cmpi 0xff >>. bne) $ do
+            ldai ppu_nametable_x
+            eor save_ppu_ctrl
+            sta save_ppu_ctrl
+    move btn_right xcoord GT 0xc1 $ do
+        inc camera_x
+        skip bne $ do
+            ldai ppu_nametable_x
+            eor save_ppu_ctrl
+            sta save_ppu_ctrl
+    move btn_up ycoord LT 0x40 $ do
+        dec camera_y
+        skip (lda camera_y >> cmpi 0xff >>. bne) $ do
+            0xef ->* camera_y
+            ldai ppu_nametable_y
+            eor save_ppu_ctrl
+            sta save_ppu_ctrl
+    move btn_down ycoord GT 0xb1 $ do
+        inc camera_y
+        skip (lda camera_y >> cmpi 0xf0 >>. bne) $ do
+            0x00 ->* camera_y
+            ldai ppu_nametable_y
+            eor save_ppu_ctrl
+            sta save_ppu_ctrl
 
 
 draw_ball = do
     let part yexpr tile attr xexpr = mdo
-            lda ball_screen_y
+            lda ball_y
+            sub camera_y
             yexpr
             sta spr_mem
             tile ->* spr_mem
             attr ->* spr_mem
-            lda ball_screen_x
+            lda ball_x
+            sub camera_x
             xexpr
             sta spr_mem
             dec sprites_left
