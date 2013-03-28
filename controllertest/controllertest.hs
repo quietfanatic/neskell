@@ -4,7 +4,7 @@
 import qualified Data.ByteString as B
 import ASM
 import ASM6502
-import NES
+import qualified NES
 import Data.Word
 import Data.Bits ((.|.), shiftL)
 import Data.Monoid
@@ -52,9 +52,9 @@ ycoord = 0x01
     nmi <- startof nmi_section
     data_begin <- startof data_section
     fillto 0xfffa 0xff
-    provide nmi_vector $ le16 nmi
-    provide reset_vector $ le16 reset
-    provide irq_vector $ le16 0
+    provide NES.nmi_vector $ le16 nmi
+    provide NES.reset_vector $ le16 reset
+    provide NES.irq_vector $ le16 0
     return data_begin
 
 init_ball = mdo
@@ -105,13 +105,13 @@ draw_ball = do
             lda ball_y
             sub camera_y
             yexpr
-            sta spr_mem
-            tile ->* spr_mem
-            attr ->* spr_mem
+            sta NES.spr_mem
+            tile ->* NES.spr_mem
+            attr ->* NES.spr_mem
             lda ball_x
             sub camera_x
             xexpr
-            sta spr_mem
+            sta NES.spr_mem
             dec sprites_left
     part nothing 0x05 0x01 nothing
     part (addi 8) 0x06 0x01 nothing
@@ -122,29 +122,29 @@ draw_ball = do
 
 read_controllers = mdo
      -- Freeze controllers for polling
-    0x01 ->* controller1
-    0x00 ->* controller1
+    0x01 ->* NES.controller1
+    0x00 ->* NES.controller1
     let read port bits = mdo
             repfor (ldxi 0x07) (dex >>. bpl) $ mdo
                 lda port
                 lsra
                 rol bits
-    read controller1 input1
-    read controller2 input2
+    read NES.controller1 input1
+    read NES.controller2 input2
 
 reset_section = mdo
-    initialize
+    NES.initialize
      -- Load all the palettes
-    lda ppu_status
-    0x3f ->* ppu_address
-    0x00 ->* ppu_address
+    lda NES.ppu_status
+    0x3f ->* NES.ppu_address
+    0x00 ->* NES.ppu_address
     fordeyin all_palettes $ mdo
         lday all_palettes
-        sta ppu_mem
+        sta NES.ppu_mem
      -- Draw background
-    lda ppu_status
-    0x20 ->* ppu_address
-    0x00 ->* ppu_address
+    lda NES.ppu_status
+    0x20 ->* NES.ppu_address
+    0x00 ->* NES.ppu_address
      -- name table
     repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
         let col = 0x00
@@ -154,28 +154,28 @@ reset_section = mdo
         repfor (0x10 ->* col) (dec col >>. bne) $ mdo
             ldyx background
             lday tiles_tl
-            sta ppu_mem
+            sta NES.ppu_mem
             lday tiles_tr
-            sta ppu_mem
+            sta NES.ppu_mem
             inx
         ldx tmpx
          -- bottom row
         repfor (0x10 ->* col) (dec col >>. bne) $ mdo
             ldyx background
             lday tiles_bl
-            sta ppu_mem
+            sta NES.ppu_mem
             lday tiles_br
-            sta ppu_mem
+            sta NES.ppu_mem
             inx
      -- attribute table
     ldai 0xAA
     repfor (ldyi 0x40) (dey >>. bne) $ mdo
-        sta ppu_mem
+        sta NES.ppu_mem
      -- enable rendering
-    save_ppu_ctrl *<- enable_nmi_bit .|. background_1000_bit
-    sta ppu_ctrl
-    ppu_mask *<- dont_clip_background_bit .|. dont_clip_sprites_bit
-             .|. enable_background_bit .|. enable_sprites_bit
+    save_ppu_ctrl *<- NES.enable_nmi_bit .|. NES.background_1000_bit
+    sta NES.ppu_ctrl
+    NES.ppu_mask *<- NES.dont_clip_background_bit .|. NES.dont_clip_sprites_bit
+                 .|. NES.enable_background_bit .|. NES.enable_sprites_bit
     
     init_ball
      -- Done with everything
@@ -185,20 +185,20 @@ reset_section = mdo
 nmi_section = mdo
     read_controllers
      -- Start sprite memory transfer
-    0x00 ->* spr_address
+    0x00 ->* NES.spr_address
     0x40 ->* sprites_left
      -- Draw the buttons
     let input_tmp = 0x00
     input1 *->* input_tmp
     repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-        ldax btnspr_y >> sta spr_mem
-        ldax btnspr_tile >> sta spr_mem
+        ldax btnspr_y >> sta NES.spr_mem
+        ldax btnspr_tile >> sta NES.spr_mem
         ldax btnspr_attr >> mdo
             asl input_tmp
             skip bcs $ mdo
                 orai 0x03
-            sta spr_mem
-        ldax btnspr_x >> sta spr_mem
+            sta NES.spr_mem
+        ldax btnspr_x >> sta NES.spr_mem
         dec sprites_left
      -- Draw the ball
     move_ball
@@ -206,15 +206,15 @@ nmi_section = mdo
      -- Stow away any unused sprites
     ldai 0xfe
     rep (dec sprites_left >>. bne) $ mdo
-        sta spr_mem
-        sta spr_mem
-        sta spr_mem
-        sta spr_mem
+        sta NES.spr_mem
+        sta NES.spr_mem
+        sta NES.spr_mem
+        sta NES.spr_mem
      -- Set the bg scroll
-    save_ppu_ctrl *->* ppu_ctrl
-    lda ppu_status
-    camera_x *->* ppu_scroll
-    camera_y *->* ppu_scroll
+    save_ppu_ctrl *->* NES.ppu_ctrl
+    lda NES.ppu_status
+    camera_x *->* NES.ppu_scroll
+    camera_y *->* NES.ppu_scroll
     rti
 
 [sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
