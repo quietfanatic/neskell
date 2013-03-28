@@ -1,6 +1,8 @@
 
 module ASM6502 where
 
+import Prelude hiding (and)
+import qualified Prelude (and)
 import Data.Word
 import Data.Int
 import qualified Data.Bits as B
@@ -507,6 +509,16 @@ tya = byte 0x98
 
  -- Nice shortcuts
 
+addi x = clc >> adci x
+addz x = clc >> adcz x
+addm x = clc >> adcm x
+add x = clc >> adc x
+
+subi x = sec >> sbci x
+subz x = sec >> sbcz x
+subm x = sec >> sbcm x
+sub x = sec >> sbc x
+
 forinxin res = repfor (ldxi 0x00) (inx >> cpxi (size res) >>. bne)
 forinyin res = repfor (ldyi 0x00) (iny >> cpyi (size res) >>. bne)
  -- NOTE: These can only work for resources of size <= 0x80
@@ -514,17 +526,81 @@ fordexin res = repfor (ldxi (size res - 1)) (dex >>. bpl)
 fordeyin res = repfor (ldyi (size res - 1)) (dey >>. bpl)
 
 infix 2 ->*
+infix 2 -&>*
+infix 2 -|>*
+infix 2 -^>*
+infix 2 -+>*
+infix 2 -->*
 infix 2 *<-
+infix 2 *<&-
+infix 2 *<|-
+infix 2 *<^-
+infix 2 *<+-
+infix 2 *<--
 infix 2 *->*
+infix 2 *-&>*
+infix 2 *-|>*
+infix 2 *-^>*
+infix 2 *-+>*
+infix 2 *-->*
 infix 2 *<-*
+infix 2 *<&-*
+infix 2 *<|-*
+infix 2 *<^-*
+infix 2 *<+-*
+infix 2 *<--*
+
 (->*) :: (Integral a, Show a, Bounded a) => Word8 -> a -> ASM6502 ()
 val ->* mem = ldai val >> sta mem
-(*->*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
-a *->* b = lda a >> sta b
+(-&>*) :: (Integral a, Show a, Bounded a) => Word8 -> a -> ASM6502 ()
+val -&>* mem = lda mem >> andi val >> sta mem
+(-|>*) :: (Integral a, Show a, Bounded a) => Word8 -> a -> ASM6502 ()
+val -|>* mem = lda mem >> orai val >> sta mem
+(-^>*) :: (Integral a, Show a, Bounded a) => Word8 -> a -> ASM6502 ()
+val -^>* mem = lda mem >> eori val >> sta mem
+(-+>*) :: (Integral a, Show a, Bounded a) => Word8 -> a -> ASM6502 ()
+val -+>* mem = lda mem >> addi val >> sta mem
+(-->*) :: (Integral a, Show a, Bounded a) => Word8 -> a -> ASM6502 ()
+val -->* mem = lda mem >> subi val >> sta mem
+
 (*<-) :: (Integral a, Show a, Bounded a) => a -> Word8 -> ASM6502 ()
-mem *<- val = ldai val >> sta mem
+(*<-) = flip (->*)
+(*<&-) :: (Integral a, Show a, Bounded a) => a -> Word8 -> ASM6502 ()
+(*<&-) = flip (-&>*)
+(*<|-) :: (Integral a, Show a, Bounded a) => a -> Word8 -> ASM6502 ()
+(*<|-) = flip (-|>*)
+(*<^-) :: (Integral a, Show a, Bounded a) => a -> Word8 -> ASM6502 ()
+(*<^-) = flip (-^>*)
+(*<+-) :: (Integral a, Show a, Bounded a) => a -> Word8 -> ASM6502 ()
+(*<+-) = flip (-+>*)
+(*<--) :: (Integral a, Show a, Bounded a) => a -> Word8 -> ASM6502 ()
+(*<--) = flip (-->*)
+
+(*->*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
+from *->* to = lda from >> sta to
+(*-&>*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
+from *-&>* to = lda to >> and from >> sta to
+(*-|>*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
+from *-|>* to = lda to >> ora from >> sta to
+(*-^>*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
+from *-^>* to = lda to >> eor from >> sta to
+(*-+>*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
+from *-+>* to = lda to >> add from >> sta to
+(*-->*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => a -> b -> ASM6502 ()
+from *-->* to = lda to >> sub from >> sta to
+
 (*<-*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
-b *<-* a = lda a >> sta b
+(*<-*) = flip (*->*)
+(*<&-*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
+(*<&-*) = flip (*-&>*)
+(*<|-*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
+(*<|-*) = flip (*-|>*)
+(*<^-*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
+(*<^-*) = flip (*-^>*)
+(*<+-*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
+(*<+-*) = flip (*-+>*)
+(*<--*) :: (Integral a, Show a, Bounded a, Integral b, Show b, Bounded b) => b -> a -> ASM6502 ()
+(*<--*) = flip (*-->*)
 
 type Res6502 = Res Word16
 res6502 :: Word16 -> [Word16] -> [Res6502]
