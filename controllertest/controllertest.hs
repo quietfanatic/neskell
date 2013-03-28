@@ -93,8 +93,7 @@ move_ball = mdo
             skip beq $ do
                 bump dir (ball_x + coord)
                 lda (ball_x + coord)
-                sec
-                sbc (camera_x + coord)
+                sub (camera_x + coord)
                 sta (ball_screen_x + coord)
                 cmpi thr
                 skip (branch dir) $ do
@@ -117,11 +116,10 @@ draw_ball = do
             xexpr
             sta spr_mem
             dec sprites_left
-        add8 = clc >> adci 0x08
     part nothing 0x05 0x01 nothing
-    part add8 0x06 0x01 nothing
-    part nothing 0x05 0x41 add8
-    part add8 0x06 0x41 add8
+    part (addi 8) 0x06 0x01 nothing
+    part nothing 0x05 0x41 (addi 8)
+    part (addi 8) 0x06 0x41 (addi 8)
 
  -- Main code stuff
 
