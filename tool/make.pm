@@ -408,7 +408,7 @@ sub run_workflow {
         status "⚙ ", show_rule($rule);
         eval { $rule->{recipe}->($rule->{to}, $rule->{from}) };
         if ($@) {
-            warn $@ unless $@ eq "\n";
+            warn $@;
             say "\e[31m✗\e[0m Did not finish due to error.";
             Cwd::chdir $old_cwd;
             return 0;
