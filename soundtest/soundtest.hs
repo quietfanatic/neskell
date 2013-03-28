@@ -2,6 +2,7 @@
 {-# LANGUAGE RecursiveDo #-}
 
 import Data.Word
+import Data.Bits
 import qualified Data.ByteString as B
 import ASM
 import ASM6502
@@ -12,26 +13,12 @@ main = do
     B.putStr $ NES.header 0x01 0x00 0x00 0x00
     B.putStr $ prgbank
 
- -- bits representing the buttons
-button_a = 0x80
-button_b = 0x40
-button_select = 0x20
-button_start = 0x10
-button_up = 0x08
-button_down = 0x04
-button_left = 0x02
-button_right = 0x01
-
 channel_program = (+ 0)
 channel_pos = (+ 2)
 channel_timer = (+ 4)
 
 square1_state = 0x90
 square2_state = 0x98
-
- -- where the controller bitfields are stored
-input1 = 0x0100
-input2 = 0x0101
 
 (prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
@@ -70,9 +57,9 @@ sound_engine nesch ch note_table default_env = mdo
         tone <- startof$ mdo
             asla
             tax
-            ldaxm note_table
+            ldax note_table
             sta low
-            ldaxm (start note_table + 1)
+            ldax (start note_table + 1)
             sta high
             default_env ->* env  -- 00110011
             iny
@@ -101,31 +88,14 @@ sound_engine nesch ch note_table default_env = mdo
 reset_section = mdo
     initialize
 
-     -- Load a palette set
+     -- Set background color
     lda ppu_status
     0x3f ->* ppu_address
     0x00 ->* ppu_address
-    repfor (ldyi 0x1f) (dey >>. bpl) $ mdo
-        lday sprite_palettes
-        sta ppu_mem
+    0x0f ->* ppu_mem
 
-     -- initialize background or something
-    lda ppu_status
-    0x20 ->* ppu_address
-    ldxi 0x00
-    stx ppu_address
-
-    ldai 0x00
-    repfor (ldyi 0x40) (dey >>. bne) $ mdo
-        repfor (ldxi 0xf0) (dex >>. bne) $ mdo
-            sta ppu_mem
-
-    ldai 0xaa
-    repfor (ldxi 0x40) (dex >>. bne) $ mdo
-        sta ppu_mem
-
-     -- enable rendering
-    ppu_ctrl *<- ppu_enable_mmi .|. ppu_background_1000
+     -- nmi for the sound
+    ppu_ctrl *<- ppu_enable_nmi
     ppu_mask *<- 0
 
      -- enable sound
@@ -140,25 +110,14 @@ reset_section = mdo
     jmp idle
 
 nmi_section = mdo
-     -- read controllers
-    0x01 ->* controller1
-    0x00 ->* controller1  -- controller poll sequence
-    repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-        lda controller1
-        lsra
-        rol input1
-    repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-        lda controller2
-        lsra
-        rol input2
 
     sound_engine NES.square1 square1_state note_table 0x33
     sound_engine NES.square2 square2_state note_table 0x32
 
     rti
 
-[sprite_palettes, background_palettes, note_table, square1_program, square2_program]
-    = res6502 data_begin [16, 16, 2 * 0x5e, length square1_program', length square2_program']
+[note_table, square1_program, square2_program]
+    = res6502 data_begin [2 * 0x5e, length square1_program', length square2_program']
 
  -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
  -- but a couple tweaks may have been made to sharpen notes up a little
@@ -183,16 +142,6 @@ square2_program' = hex $ ""
     ++ "0000"
 
 data_section = mdo
-    provide sprite_palettes $ hexdata$ ""
-        ++ "2212020f"
-        ++ "2a1a0a0f"
-        ++ "2616060f"
-        ++ "3010000f"
-    provide background_palettes $ hexdata$ ""
-        ++ "2212020f"
-        ++ "2a1a0a0f"
-        ++ "2616060f"
-        ++ "3010000f"
     provide note_table $ sequence $ map le16 $ note_table'
     provide square1_program $ bytes square1_program'
     provide square2_program $ bytes square2_program'
