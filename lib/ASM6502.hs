@@ -45,7 +45,7 @@ op8or16 :: (Integral x, Show x, Bounded x) => Word8 -> Word8 -> x -> ASM6502 ()
 op8or16 = op8or16' maxBound
 
 op8or16' :: (Integral x, Show x, Bounded x) => x -> Word8 -> Word8 -> x -> ASM6502 ()
-op8or16' max a b x = case max of
+op8or16' max a b x = case toInteger max of
     255 -> byte a >> byte (fromIntegral x)
     127 -> byte a >> byte (fromIntegral x)
     65535 -> byte b >> le16 (fromIntegral x)

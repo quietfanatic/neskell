@@ -137,7 +137,7 @@ prg_main = mdo
         0x3f ->* ppu_address
         0x00 ->* ppu_address
         repfor (ldyi 0x1f) (dey >>. bpl) $ mdo
-            lday (start sprite_palettes)
+            lday sprite_palettes
             sta ppu_mem
          -- Draw background
         lda ppu_status
@@ -216,37 +216,37 @@ prg_main = mdo
 
     data_begin <- here
 
-    provide sprite_palettes$ hexdata$ ""
+    provide sprite_palettes $ hexdata$ ""
         ++ "2212020f"
         ++ "2a1a0a0f"
         ++ "2616060f"
         ++ "3010000f"
 
-    background_palettes <- startof$ hexdata$ ""
+    provide background_palettes $ hexdata$ ""
         ++ "2212020f"
         ++ "2a1a0a0f"
         ++ "2616060f"
         ++ "3010000f"
 
-    btnspr_x <- startof$ hexdata$
+    provide btnspr_x $ hexdata$
         "d0 bf c8 c8 e0 d8 e8 f0"
-    btnspr_y <- startof$ hexdata$
+    provide btnspr_y $ hexdata$
         "d0 d0 d8 c8 d0 d0 d0 d0"
-    btnspr_tile <- startof$ hexdata$
+    provide btnspr_tile $ hexdata$
         "01 01 00 00 03 03 02 02"
-    btnspr_attr <- startof$ hexdata$
+    provide btnspr_attr $ hexdata$
         "40 00 80 00 00 00 01 01"
 
-    tiles_tl <- startof$ hexdata$
+    provide tiles_tl $ hexdata$
         "00 01 02 01 04 06 06"
-    tiles_tr <- startof$ hexdata$
+    provide tiles_tr $ hexdata$
         "00 01 01 03 06 05 06"
-    tiles_bl <- startof$ hexdata$
+    provide tiles_bl $ hexdata$
         "00 06 04 06 04 06 06"
-    tiles_br <- startof$ hexdata$
+    provide tiles_br $ hexdata$
         "00 06 06 05 06 05 06"
 
-    background <- startof$ hexdata$ ""
+    provide background $ hexdata$ ""
         ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
         ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
         ++ "00 00 00 00 00 00 00 00 00 00 00 00 00 00 00 00"
@@ -265,7 +265,7 @@ prg_main = mdo
 
     return (nmi, reset, 0, data_begin)
 
-[sprite_palettes, background_palletes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
+[sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
  tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
  [16, 16, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
   

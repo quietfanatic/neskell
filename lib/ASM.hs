@@ -164,7 +164,7 @@ infixl 1 >>.
 cmp >>. branch = (cmp >>) . branch
 
 
-data Res a = Res a a
+data Res a = Res a a deriving (Show, Eq, Ord)
 start (Res x _) = x
 size (Res _ x) = x
 end (Res start size) = start + size
@@ -192,4 +192,30 @@ merge_res = foldl1 merge2 where
     merge2 a b = if end a == start b
         then Res (start a) (end b)
         else error$ "Tried to merge resources that didn't match."
+
+instance Num a => Num (Res a) where
+    (+) = error$ "Can't (+) Res."
+    (*) = error$ "Can't (*) Res."
+    (-) = error$ "Can't (-) Res."
+    abs = error$ "Can't abs Res."
+    signum = error$ "Can't signum Res."
+    fromInteger x = Res (fromInteger x) 0
+
+instance Enum a => Enum (Res a) where
+    succ (Res st sz) = Res (succ st) sz
+    pred (Res st sz) = Res (pred st) sz
+    toEnum = error$ "Can't toEnum to get Res."
+    fromEnum = error$ "Can't fromEnum Res (you can toInteger it though."
+
+instance Real a => Real (Res a) where
+    toRational = toRational . start
+
+instance Integral a => Integral (Res a) where
+    quotRem = error$ "Can't quotRem Res.  It's only Integral for its toInteger."
+    toInteger (Res s _) = toInteger s
+
+ -- Kinda icky but okay
+instance Bounded a => Bounded (Res a) where
+    minBound = Res minBound minBound
+    maxBound = Res maxBound maxBound
 
