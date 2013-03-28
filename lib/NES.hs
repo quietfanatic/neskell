@@ -20,6 +20,8 @@ header prgs chrs mapper flags = do
  -- The names of various memory-mapped ports
 
 ppu_ctrl = 0x2000 :: Word16
+ppu_xtable = bit 0 :: Word8
+ppu_ytable = bit 1 :: Word8
 ppu_inc_32 = bit 2 :: Word8
 ppu_sprites_1000 = bit 3 :: Word8
 ppu_background_1000 = bit 4 :: Word8
