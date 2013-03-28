@@ -190,7 +190,7 @@ provide_at off res code = mdo
 merge_res :: (Num a, Eq a) => [Res a] -> Res a
 merge_res = foldl1 merge2 where
     merge2 a b = if end a == start b
-        then Res (start a) (end b)
+        then Res (start a) (size a + size b)
         else error$ "Tried to merge resources that didn't match."
 
 instance Num a => Num (Res a) where

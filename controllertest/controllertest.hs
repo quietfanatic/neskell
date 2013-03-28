@@ -136,15 +136,15 @@ prg_main = mdo
         lda ppu_status
         0x3f ->* ppu_address
         0x00 ->* ppu_address
-        repfor (ldyi 0x1f) (dey >>. bpl) $ mdo
-            lday sprite_palettes
+        repfor (ldyi (size all_palettes - 1)) (dey >>. bpl) $ mdo
+            lday all_palettes
             sta ppu_mem
          -- Draw background
         lda ppu_status
         0x20 ->* ppu_address
         0x00 ->* ppu_address
          -- name table
-        repfor (ldxi 0x00) (cpxi 0xf0 >>. bne) $ mdo
+        repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
             let col = 0x00
                 tmpx = 0x01
              -- top row
@@ -268,6 +268,8 @@ prg_main = mdo
 [sprite_palettes, background_palettes, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
  tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
  [16, 16, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
-  
+
+all_palettes :: Res6502
+all_palettes = merge_res [sprite_palettes, background_palettes]
 
 
