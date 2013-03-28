@@ -99,25 +99,31 @@ move_ball = mdo
             0x00 ->* camera_y
             NES.nametable_y_bit -^>* save_ppu_ctrl
 
-draw_model :: Res6502 -> ASM6502 ()
-draw_model model = do
-    fordeyin model $ do
-        lday model
-        add ball_y
+ -- draw_model_sub: Y = model size in bytes, 00:01 = pointer to model, 02 = xcoord, 03 = ycoord
+draw_model_sub = do
+    let modelp = 0x00
+        xcoord = 0x02
+        ycoord = 0x03
+    dey
+    rep bpl $ do
+        ldayp modelp
+        add ycoord
         sub camera_y
         sta NES.spr_mem
         dey
-        lday model
+        ldayp modelp
         sta NES.spr_mem
         dey
-        lday model
+        ldayp modelp
         sta NES.spr_mem
         dey
-        lday model
-        add ball_x
+        ldayp modelp
+        add xcoord
         sub camera_x
         sta NES.spr_mem
         dec sprites_left
+        dey
+    rts
 
  -- Main code stuff
 
@@ -199,7 +205,12 @@ nmi_section = mdo
         dec sprites_left
      -- Draw the ball
     move_ball
-    draw_model ball_model
+    low ball_model ->* 0x00
+    high ball_model ->* 0x01
+    ball_x *->* 0x02
+    ball_y *->* 0x03
+    ldyi (size ball_model)
+    jsr draw_model
      -- Stow away any unused sprites
     ldai 0xfe
     rep (dec sprites_left >>. bne) $ mdo
@@ -213,6 +224,9 @@ nmi_section = mdo
     camera_x *->* NES.ppu_scroll
     camera_y *->* NES.ppu_scroll
     rti
+
+    draw_model <- startof draw_model_sub
+    nothing
 
 [sprite_palettes, background_palettes, ball_model, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
  tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = res6502 data_begin
