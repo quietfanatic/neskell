@@ -603,6 +603,6 @@ from *-->* to = lda to >> sub from >> sta to
 (*<--*) = flip (*-->*)
 
 type Res6502 = Res Word16
-res6502 :: Word16 -> [Word16] -> [Res6502]
+res6502 :: Integral a => Word16 -> [a] -> [Res6502]
 res6502 = resources
 

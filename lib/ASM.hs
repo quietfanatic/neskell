@@ -178,9 +178,10 @@ start (Res x _) = x
 size (Res _ x) = x
 end (Res start size) = start + size
 
-resources :: Num a => a -> [a] -> [Res a]
+resources :: (Num a, Integral b) => a -> [b] -> [Res a]
 resources start [] = []
-resources start (size:sizes) = Res start size : resources (start + size) sizes
+resources start (size:sizes) = Res start isize : resources (start + isize) sizes where
+    isize = fromIntegral size
 
 provide :: (Num ctr, Eq ctr, Show ctr) => Res ctr -> ASM ctr a -> ASM ctr a
 provide res code = mdo
