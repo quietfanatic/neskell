@@ -9,6 +9,7 @@ import Data.Word
 import Data.Bits ((.|.), shiftL)
 import Debug.Trace
 
+
 main = do
     B.putStr $ NES.header 0x01 0x01 0x00 0x00
     B.putStr $ prgbank
@@ -19,16 +20,6 @@ main = do
     B.putStr $ background
     B.putStr $ B.replicate (0x1000 - B.length background) 0xff
 
-
-(prgbank, 0, data_begin) = asm 0 $ mdo
-    set_counter 0xc000
-    (nmi, reset, irq) <- prg_main
-    data_begin <- startof data_section
-    fillto 0xfffa 0xff
-    provide nmi_vector $ le16 (fromIntegral nmi)
-    provide reset_vector $ le16 (fromIntegral reset)
-    provide irq_vector $ le16 (fromIntegral irq)
-    return data_begin
 
 bitlist :: [Word8]
 bitlist = map (shiftL 1) [0..]
@@ -48,9 +39,19 @@ ball_x : ball_y :
 xcoord = 0x00
 ycoord = 0x01
 
-
 save_ppu_ctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
 
+(prgbank, 0, data_begin) = asm 0 $ mdo
+    set_counter 0xc000
+    reset <- startof reset_section
+    nmi <- startof nmi_section
+    let irq = 0
+    data_begin <- startof data_section
+    fillto 0xfffa 0xff
+    provide nmi_vector $ le16 (fromIntegral nmi)
+    provide reset_vector $ le16 (fromIntegral reset)
+    provide irq_vector $ le16 (fromIntegral irq)
+    return data_begin
 
 init_ball = mdo
     ldai 0x80
@@ -130,94 +131,90 @@ read_controllers = mdo
     read controller1 input1
     read controller2 input2
 
-prg_main = mdo
+reset_section = mdo
+    initialize
+     -- Load all the palettes
+    lda ppu_status
+    0x3f ->* ppu_address
+    0x00 ->* ppu_address
+    fordeyin all_palettes $ mdo
+        lday all_palettes
+        sta ppu_mem
+     -- Draw background
+    lda ppu_status
+    0x20 ->* ppu_address
+    0x00 ->* ppu_address
+     -- name table
+    repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
+        let col = 0x00
+            tmpx = 0x01
+         -- top row
+        stx tmpx
+        repfor (0x10 ->* col) (dec col >>. bne) $ mdo
+            ldyx background
+            lday tiles_tl
+            sta ppu_mem
+            lday tiles_tr
+            sta ppu_mem
+            inx
+        ldx tmpx
+         -- bottom row
+        repfor (0x10 ->* col) (dec col >>. bne) $ mdo
+            ldyx background
+            lday tiles_bl
+            sta ppu_mem
+            lday tiles_br
+            sta ppu_mem
+            inx
+     -- attribute table
+    ldai 0xAA
+    repfor (ldyi 0x40) (dey >>. bne) $ mdo
+        sta ppu_mem
+     -- enable rendering
+    save_ppu_ctrl *<- ppu_enable_nmi .|. ppu_background_1000
+    sta ppu_ctrl
+    ppu_mask *<- ppu_dont_clip_background .|. ppu_dont_clip_sprites
+             .|. ppu_enable_background .|. ppu_enable_sprites
     
-    idle <- startof$ jmp idle
+    init_ball
+     -- Done with everything
+    idle <- here
+    jmp idle
 
-    reset <- startof$ mdo
-        initialize
-         -- Load all the palettes
-        lda ppu_status
-        0x3f ->* ppu_address
-        0x00 ->* ppu_address
-        fordeyin all_palettes $ mdo
-            lday all_palettes
-            sta ppu_mem
-         -- Draw background
-        lda ppu_status
-        0x20 ->* ppu_address
-        0x00 ->* ppu_address
-         -- name table
-        repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
-            let col = 0x00
-                tmpx = 0x01
-             -- top row
-            stx tmpx
-            repfor (0x10 ->* col) (dec col >>. bne) $ mdo
-                ldyx background
-                lday tiles_tl
-                sta ppu_mem
-                lday tiles_tr
-                sta ppu_mem
-                inx
-            ldx tmpx
-             -- bottom row
-            repfor (0x10 ->* col) (dec col >>. bne) $ mdo
-                ldyx background
-                lday tiles_bl
-                sta ppu_mem
-                lday tiles_br
-                sta ppu_mem
-                inx
-         -- attribute table
-        ldai 0xAA
-        repfor (ldyi 0x40) (dey >>. bne) $ mdo
-            sta ppu_mem
-         -- enable rendering
-        save_ppu_ctrl *<- ppu_enable_nmi .|. ppu_background_1000
-        sta ppu_ctrl
-        ppu_mask *<- ppu_dont_clip_background .|. ppu_dont_clip_sprites
-                 .|. ppu_enable_background .|. ppu_enable_sprites
-        
-        init_ball
-        jmp idle
-
-    nmi <- startof$ mdo
-        read_controllers
-         -- Start sprite memory transfer
-        0x00 ->* spr_address
-        0x40 ->* sprites_left
-         -- Draw the buttons
-        let input_tmp = 0x00
-        input1 *->* input_tmp
-        repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-            ldax btnspr_y >> sta spr_mem
-            ldax btnspr_tile >> sta spr_mem
-            ldax btnspr_attr >> mdo
-                asl input_tmp
-                skip bcs $ mdo
-                    orai 0x03
-                sta spr_mem
-            ldax btnspr_x >> sta spr_mem
-            dec sprites_left
-         -- Draw the ball
-        move_ball
-        draw_ball
-         -- Stow away any unused sprites
-        ldai 0xfe
-        rep (dec sprites_left >>. bne) $ mdo
+nmi_section = mdo
+    read_controllers
+     -- Start sprite memory transfer
+    0x00 ->* spr_address
+    0x40 ->* sprites_left
+     -- Draw the buttons
+    let input_tmp = 0x00
+    input1 *->* input_tmp
+    repfor (ldxi 0x07) (dex >>. bpl) $ mdo
+        ldax btnspr_y >> sta spr_mem
+        ldax btnspr_tile >> sta spr_mem
+        ldax btnspr_attr >> mdo
+            asl input_tmp
+            skip bcs $ mdo
+                orai 0x03
             sta spr_mem
-            sta spr_mem
-            sta spr_mem
-            sta spr_mem
-         -- Set the bg scroll
-        save_ppu_ctrl *->* ppu_ctrl
-        lda ppu_status
-        camera_x *->* ppu_scroll
-        camera_y *->* ppu_scroll
-        rti
-
-    return (nmi, reset, 0)
+        ldax btnspr_x >> sta spr_mem
+        dec sprites_left
+     -- Draw the ball
+    move_ball
+    draw_ball
+     -- Stow away any unused sprites
+    ldai 0xfe
+    rep (dec sprites_left >>. bne) $ mdo
+        sta spr_mem
+        sta spr_mem
+        sta spr_mem
+        sta spr_mem
+     -- Set the bg scroll
+    save_ppu_ctrl *->* ppu_ctrl
+    lda ppu_status
+    camera_x *->* ppu_scroll
+    camera_y *->* ppu_scroll
+    rti
 
 data_section = mdo
 
