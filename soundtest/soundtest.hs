@@ -23,26 +23,24 @@ square2_state = 0x98
     nmi <- startof nmi_section
     data_begin <- startof data_section
     fillto 65530 0xff
-    provide NES.nmi_vector $ le16 nmi
-    provide NES.reset_vector $ le16 reset
-    provide NES.irq_vector $ le16 0
+    provide NES.nmi $ le16 nmi
+    provide NES.reset $ le16 reset
+    provide NES.irq $ le16 0
     return data_begin
 
 reset_section = mdo
     NES.initialize
 
      -- Set background color
-    lda NES.ppu_status
-    0x3f ->* NES.ppu_addr
-    0x00 ->* NES.ppu_addr
-    0x0f ->* NES.ppu_mem
+    NES.set_ppuaddr 0x3f00
+    0x0f ->* NES.ppudata
 
      -- nmi for the sound
-    NES.ppu_ctrl *<- NES.enable_nmi_bit
-    NES.ppu_mask *<- 0
+    NES.ppuctrl *<- NES.enable_nmi_bit
+    NES.ppumask *<- 0
 
      -- enable sound
-    0x03 ->* NES.apu_flags  -- 00000011
+    0x03 ->* NES.apuctrl  -- 00000011
 
     S.init_sound_engine NES.square1 square1_state square1_program 0x30
     S.init_sound_engine NES.square2 square2_state square2_program 0x30

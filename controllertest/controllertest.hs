@@ -35,7 +35,7 @@ ball_x : ball_y :
 
  -- MAIN MEMORY ALLOCATIONS
 
-save_ppu_ctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
+save_ppuctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
 
  -- UTILITY VALUES
 
@@ -52,9 +52,9 @@ ycoord = 0x01
     nmi <- startof nmi_section
     data_begin <- startof data_section
     fillto 0xfffa 0xff
-    provide NES.nmi_vector $ le16 nmi
-    provide NES.reset_vector $ le16 reset
-    provide NES.irq_vector $ le16 0
+    provide NES.nmi $ le16 nmi
+    provide NES.reset $ le16 reset
+    provide NES.irq $ le16 0
     return data_begin
 
 init_ball = mdo
@@ -83,21 +83,21 @@ move_ball = mdo
     move btn_left xcoord LT 0x40 $ do
         dec camera_x
         skip (lda camera_x >> cmpi 0xff >>. bne) $ do
-            NES.nametable_x_bit -^>* save_ppu_ctrl
+            NES.nametable_x_bit -^>* save_ppuctrl
     move btn_right xcoord GT 0xc1 $ do
         inc camera_x
         skip bne $ do
-            NES.nametable_x_bit -^>* save_ppu_ctrl
+            NES.nametable_x_bit -^>* save_ppuctrl
     move btn_up ycoord LT 0x40 $ do
         dec camera_y
         skip (lda camera_y >> cmpi 0xff >>. bne) $ do
             0xef ->* camera_y
-            NES.nametable_y_bit -^>* save_ppu_ctrl
+            NES.nametable_y_bit -^>* save_ppuctrl
     move btn_down ycoord GT 0xb1 $ do
         inc camera_y
         skip (lda camera_y >> cmpi 0xf0 >>. bne) $ do
             0x00 ->* camera_y
-            NES.nametable_y_bit -^>* save_ppu_ctrl
+            NES.nametable_y_bit -^>* save_ppuctrl
 
  -- draw_model_sub: Y = model size in bytes, 00:01 = pointer to model, 02 = xcoord, 03 = ycoord
 draw_model_sub = do
@@ -109,18 +109,18 @@ draw_model_sub = do
         ldayp modelp
         add ycoord
         sub camera_y
-        sta NES.spr_mem
+        sta NES.oamdata
         dey
         ldayp modelp
-        sta NES.spr_mem
+        sta NES.oamdata
         dey
         ldayp modelp
-        sta NES.spr_mem
+        sta NES.oamdata
         dey
         ldayp modelp
         add xcoord
         sub camera_x
-        sta NES.spr_mem
+        sta NES.oamdata
         dec sprites_left
         dey
     rts
@@ -142,12 +142,12 @@ read_controllers = mdo
 reset_section = mdo
     NES.initialize
      -- Load all the palettes
-    NES.set_ppu_addr 0x3f00
+    NES.set_ppuaddr 0x3f00
     fordeyin all_palettes $ mdo
         lday all_palettes
-        sta NES.ppu_mem
+        sta NES.ppudata
      -- Draw background
-    NES.set_ppu_addr 0x2000
+    NES.set_ppuaddr 0x2000
      -- name table
     repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
         let col = 0x00
@@ -157,28 +157,28 @@ reset_section = mdo
         repfor (0x10 ->* col) (dec col >>. bne) $ mdo
             ldyx background
             lday tiles_tl
-            sta NES.ppu_mem
+            sta NES.ppudata
             lday tiles_tr
-            sta NES.ppu_mem
+            sta NES.ppudata
             inx
         ldx tmpx
          -- bottom row
         repfor (0x10 ->* col) (dec col >>. bne) $ mdo
             ldyx background
             lday tiles_bl
-            sta NES.ppu_mem
+            sta NES.ppudata
             lday tiles_br
-            sta NES.ppu_mem
+            sta NES.ppudata
             inx
      -- attribute table
     ldai 0xAA
     repfor (ldyi 0x40) (dey >>. bne) $ mdo
-        sta NES.ppu_mem
+        sta NES.ppudata
      -- enable rendering
-    save_ppu_ctrl *<- NES.enable_nmi_bit .|. NES.background_1000_bit
-    sta NES.ppu_ctrl
-    NES.ppu_mask *<- NES.dont_clip_background_bit .|. NES.dont_clip_sprites_bit
-                 .|. NES.enable_background_bit .|. NES.enable_sprites_bit
+    save_ppuctrl *<- NES.enable_nmi_bit .|. NES.background_1000_bit
+    sta NES.ppuctrl
+    NES.ppumask *<- NES.dont_clip_background_bit .|. NES.dont_clip_sprites_bit
+                .|. NES.enable_background_bit .|. NES.enable_sprites_bit
 
     init_ball
      -- Done with everything
@@ -188,20 +188,20 @@ reset_section = mdo
 nmi_section = mdo
     read_controllers
      -- Start sprite memory transfer
-    0x00 ->* NES.spr_addr
+    0x00 ->* NES.oamaddr
     0x40 ->* sprites_left
      -- Draw the buttons
     let input_tmp = 0x00
     input1 *->* input_tmp
     repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-        ldax btnspr_y >> sta NES.spr_mem
-        ldax btnspr_tile >> sta NES.spr_mem
+        ldax btnspr_y >> sta NES.oamdata
+        ldax btnspr_tile >> sta NES.oamdata
         ldax btnspr_attr >> mdo
             asl input_tmp
             skip bcs $ mdo
                 orai 0x03
-            sta NES.spr_mem
-        ldax btnspr_x >> sta NES.spr_mem
+            sta NES.oamdata
+        ldax btnspr_x >> sta NES.oamdata
         dec sprites_left
      -- Draw the ball
     move_ball
@@ -214,15 +214,15 @@ nmi_section = mdo
      -- Stow away any unused sprites
     ldai 0xfe
     rep (dec sprites_left >>. bne) $ mdo
-        sta NES.spr_mem
-        sta NES.spr_mem
-        sta NES.spr_mem
-        sta NES.spr_mem
+        sta NES.oamdata
+        sta NES.oamdata
+        sta NES.oamdata
+        sta NES.oamdata
      -- Set the bg scroll
-    save_ppu_ctrl *->* NES.ppu_ctrl
-    lda NES.ppu_status
-    camera_x *->* NES.ppu_scroll
-    camera_y *->* NES.ppu_scroll
+    save_ppuctrl *->* NES.ppuctrl
+    lda NES.ppustatus
+    camera_x *->* NES.ppuscroll
+    camera_y *->* NES.ppuscroll
     rti
 
     draw_model <- startof draw_model_sub
