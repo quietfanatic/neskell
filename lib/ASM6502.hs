@@ -23,7 +23,7 @@ op8 a x = byte a >> Assembly f where
         res = case no_overflow x :: Maybe Word8 of
             Just w8 -> S.singleton w8
             Nothing -> error$ "Overflow error in op8 (" ++ show x ++ ")"
-        in (res, succ start, ())
+        in (res, start + 1, ())
 
 op16 :: (Integral x, Show x) => Word8 -> x -> ASM6502 ()
 op16 a x = byte a >> Assembly f where
@@ -34,7 +34,7 @@ op16 a x = byte a >> Assembly f where
                 Just w16 -> w16
                 Nothing -> error$ "Overflow error in op16 (" ++ show x ++ ")"
         res = S.singleton (fromIntegral res16) S.>< S.singleton (fromIntegral (B.shiftR res16 8))
-        in (res, succ (succ start), ())
+        in (res, start + 2, ())
 
  -- case (maxBound of argument type) of
  --    8bit -> generate op8
@@ -67,11 +67,11 @@ instance Bounded Integer where
 rel8 :: Integral a => Word8 -> a -> ASM6502 ()
 rel8 b x = byte b >> Assembly f where
     f start = let
-        off = fromIntegral x - fromIntegral (succ start)
+        off = fromIntegral x - fromIntegral (start + 1)
         res = case no_overflow off :: Maybe Int8 of
             Just i8 -> S.singleton (fromIntegral i8)
             Nothing -> fail$ "Overflow error in relative calculation (" ++ show off ++ ")"
-        in (res, succ start, ())
+        in (res, start + 1, ())
 
 adci :: (Integral a, Show a) => a -> ASM6502 ()
 adci = op8 0x69

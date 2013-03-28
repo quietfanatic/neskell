@@ -16,23 +16,23 @@ nothing = Assembly (\c -> (mempty, c, ()))
 here :: Monoid mon => Assembly mon ctr ctr
 here = Assembly (\c -> (mempty, c, c))
 
-unit :: Enum ctr => mon -> Assembly mon ctr ()
-unit u = Assembly (\c -> (u, succ c, ()))
+unit :: Num ctr => mon -> Assembly mon ctr ()
+unit u = Assembly (\c -> (u, c + 1, ()))
 
-units :: (Monoid mon, Enum ctr, F.Foldable a) => a mon -> Assembly mon ctr ()
-units us = Assembly (\c -> (F.fold us, F.foldl (const . succ) c us, ()))
+units :: (Monoid mon, Num ctr, F.Foldable a) => a mon -> Assembly mon ctr ()
+units us = Assembly (\c -> (F.fold us, F.foldl (const . (+ 1)) c us, ()))
 
 pad_assembly :: (Monoid mon, Integral ctr) => ctr -> mon -> Assembly mon ctr a -> Assembly mon ctr a
 pad_assembly size filling (Assembly code) = Assembly f where
     f start = let
         (coderes, finish, ret) = code start
-        isize = fromIntegral size :: Int
-        icodesize = fromIntegral finish - fromIntegral start :: Int
-        res = if icodesize > isize
+        res = if finish > start + size
             then error$ "Code given to pad_assembly was larger than the alloted size ("
-                     ++ show icodesize ++ " > " ++ show isize ++ ")."
-            else coderes <> F.fold (replicate (isize - icodesize) filling)
-        in (res, size, ret)
+                     ++ show (toInteger finish) ++ " - "
+                     ++ show (toInteger start) ++ " > "
+                     ++ show (toInteger size) ++ ")."
+            else coderes <> F.fold (replicate (fromIntegral (finish - (start + size))) filling)
+        in (res, max finish (start + size), ret)
 
 return_assembly :: Monoid mon => a -> Assembly mon ctr a
 return_assembly x = Assembly (\c -> (mempty, c, x))

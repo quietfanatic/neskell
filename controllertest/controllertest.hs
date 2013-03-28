@@ -7,6 +7,7 @@ import ASM6502
 import NES
 import Data.Word
 import Data.Bits ((.|.), shiftL)
+import Debug.Trace
 
 main = do
     B.putStr code
@@ -22,11 +23,14 @@ top = mdo
 
 prgbank = mdo
     set_counter 0xc000
-    begin <- here
+--    begin <- here
+--    trace (show begin) nothing
     (nmi, reset, irq, data_begin) <- pad (0x4000 - 6) 0xff prg_main
-    le16 (fromIntegral nmi)
-    le16 (fromIntegral reset)
-    le16 (fromIntegral irq)
+--    pos <- here
+--    trace (show pos) nothing
+    provide nmi_vector $ le16 (fromIntegral nmi)
+    provide reset_vector $ le16 (fromIntegral reset)
+    provide irq_vector $ le16 (fromIntegral irq)
     return data_begin
 
 chrbank :: String -> ASM6502 ()

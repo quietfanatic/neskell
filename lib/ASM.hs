@@ -32,20 +32,20 @@ asm start (Assembly f) = let
     (seq, finish, ret) = f start
     in (B.pack (F.toList seq), finish, ret)
 
-byte :: Enum ctr => Word8 -> ASM ctr ()
+byte :: Num ctr => Word8 -> ASM ctr ()
 byte = unit . S.singleton
 
-bytes :: Enum ctr => F.Foldable t => t Word8 -> ASM ctr ()
-bytes bs = Assembly (\c -> (S.fromList (F.toList bs), F.foldl (const . succ) c bs, ()))
+bytes :: Num ctr => F.Foldable t => t Word8 -> ASM ctr ()
+bytes bs = Assembly (\c -> (S.fromList (F.toList bs), F.foldl (const . (+ 1)) c bs, ()))
 
-ascii :: Enum ctr => [Char] -> ASM ctr ()
+ascii :: Num ctr => [Char] -> ASM ctr ()
 ascii = bytes . map (fromIntegral . ord)
 
-bytestring :: Enum ctr => B.ByteString -> ASM ctr ()
-bytestring = bytes . B.unpack
+bytestring :: Num ctr => B.ByteString -> ASM ctr ()
+bytestring bs = Assembly (\c -> (S.fromList (B.unpack bs), fromIntegral (B.length bs), ()))
 
 {-# NOINLINE binfile #-}
-binfile :: Enum ctr => String -> ASM ctr ()
+binfile :: Num ctr => String -> ASM ctr ()
 binfile = bytestring . unsafePerformIO . B.readFile
 
 fill :: Integral ctr => ctr -> Word8 -> ASM ctr ()
@@ -62,30 +62,30 @@ hex (c:rest) | not (isHexDigit c) = hex rest
 hex (h:l:rest) | isHexDigit l = fromIntegral (digitToInt h * 16 + digitToInt l) : hex rest
 hex _ = error "Odd number of hex digits in hexdata string."
 
-hexdata :: Enum ctr => String -> ASM ctr ()
+hexdata :: Num ctr => String -> ASM ctr ()
 hexdata = bytes . hex
 
-le16 :: (Enum ctr, Show ctr) => Word16 -> ASM ctr ()
+le16 :: (Num ctr, Show ctr) => Word16 -> ASM ctr ()
 le16 w = do
     byte$ fromIntegral w
     byte$ fromIntegral (shiftR w 8)
-be16 :: (Enum ctr, Show ctr) => Word16 -> ASM ctr ()
+be16 :: (Num ctr, Show ctr) => Word16 -> ASM ctr ()
 be16 w = do
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral w
-le32 :: (Enum ctr, Show ctr) => Word32 -> ASM ctr ()
+le32 :: (Num ctr, Show ctr) => Word32 -> ASM ctr ()
 le32 w = do
     byte$ fromIntegral w
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral (shiftR w 16)
     byte$ fromIntegral (shiftR w 24)
-be32 :: (Enum ctr, Show ctr) => Word32 -> ASM ctr ()
+be32 :: (Num ctr, Show ctr) => Word32 -> ASM ctr ()
 be32 w = do
     byte$ fromIntegral (shiftR w 24)
     byte$ fromIntegral (shiftR w 16)
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral w
-le64 :: (Enum ctr, Show ctr) => Word64 -> ASM ctr ()
+le64 :: (Num ctr, Show ctr) => Word64 -> ASM ctr ()
 le64 w = do
     byte$ fromIntegral w
     byte$ fromIntegral (shiftR w 8)
@@ -95,7 +95,7 @@ le64 w = do
     byte$ fromIntegral (shiftR w 40)
     byte$ fromIntegral (shiftR w 48)
     byte$ fromIntegral (shiftR w 56)
-be64 :: (Enum ctr, Show ctr) => Word64 -> ASM ctr ()
+be64 :: (Num ctr, Show ctr) => Word64 -> ASM ctr ()
 be64 w = do
     byte$ fromIntegral (shiftR w 56)
     byte$ fromIntegral (shiftR w 48)
@@ -105,13 +105,13 @@ be64 w = do
     byte$ fromIntegral (shiftR w 16)
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral w
-lefloat :: (Enum ctr, Show ctr) => Float -> ASM ctr ()
+lefloat :: (Num ctr, Show ctr) => Float -> ASM ctr ()
 lefloat = le32 . unsafeCoerce
-befloat :: (Enum ctr, Show ctr) => Float -> ASM ctr ()
+befloat :: (Num ctr, Show ctr) => Float -> ASM ctr ()
 befloat = be32 . unsafeCoerce
-ledouble :: (Enum ctr, Show ctr) => Double -> ASM ctr ()
+ledouble :: (Num ctr, Show ctr) => Double -> ASM ctr ()
 ledouble = le32 . unsafeCoerce
-bedouble :: (Enum ctr, Show ctr) => Double -> ASM ctr ()
+bedouble :: (Num ctr, Show ctr) => Double -> ASM ctr ()
 bedouble = be32 . unsafeCoerce
 
 

@@ -98,3 +98,5 @@ initialize_end = do
 initialize_custom_clear clear = initialize_begin >> clear >> initialize_end
 initialize = initialize_custom_clear clear_memory
 
+[nmi_vector, reset_vector, irq_vector] = res6502 0xfffa [2, 2, 2]
+
