@@ -125,8 +125,8 @@ reset_section = mdo
         sta ppu_mem
 
      -- enable rendering
-    0x90 ->* ppu_ctrl  -- 10010000 enable nmi, background at ppu0x1000
-    0x1e ->* ppu_mask  -- 00011110
+    ppu_ctrl *<- ppu_enable_mmi .|. ppu_background_1000
+    ppu_mask *<- 0
 
      -- enable sound
     0x30 ->* square1_env  -- 00110000
@@ -155,7 +155,6 @@ nmi_section = mdo
     sound_engine NES.square1 square1_state note_table 0x33
     sound_engine NES.square2 square2_state note_table 0x32
 
-    done <- here
     rti
 
 [sprite_palettes, background_palettes, note_table, square1_program, square2_program]
