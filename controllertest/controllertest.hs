@@ -142,12 +142,12 @@ read_controllers = mdo
 reset_section = mdo
     NES.initialize
      -- Load all the palettes
-    NES.set_ppu_address 0x3f00
+    NES.set_ppu_addr 0x3f00
     fordeyin all_palettes $ mdo
         lday all_palettes
         sta NES.ppu_mem
      -- Draw background
-    NES.set_ppu_address 0x2000
+    NES.set_ppu_addr 0x2000
      -- name table
     repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
         let col = 0x00
@@ -179,7 +179,7 @@ reset_section = mdo
     sta NES.ppu_ctrl
     NES.ppu_mask *<- NES.dont_clip_background_bit .|. NES.dont_clip_sprites_bit
                  .|. NES.enable_background_bit .|. NES.enable_sprites_bit
-    
+
     init_ball
      -- Done with everything
     idle <- here
@@ -188,7 +188,7 @@ reset_section = mdo
 nmi_section = mdo
     read_controllers
      -- Start sprite memory transfer
-    0x00 ->* NES.spr_address
+    0x00 ->* NES.spr_addr
     0x40 ->* sprites_left
      -- Draw the buttons
     let input_tmp = 0x00
@@ -238,16 +238,16 @@ all_palettes = sprite_palettes <> background_palettes
 data_section = mdo
 
     provide sprite_palettes $ hexdata$ ""
-        ++ "2212020f"
-        ++ "2a1a0a0f"
-        ++ "2616060f"
-        ++ "3010000f"
+        ++ "22 12 02 0f"
+        ++ "2a 1a 0a 0f"
+        ++ "26 16 06 0f"
+        ++ "30 10 00 0f"
 
     provide background_palettes $ hexdata$ ""
-        ++ "2212020f"
-        ++ "2a1a0a0f"
-        ++ "2616060f"
-        ++ "3010000f"
+        ++ "22 12 02 0f"
+        ++ "2a 1a 0a 0f"
+        ++ "26 16 06 0f"
+        ++ "30 10 00 0f"
 
     provide ball_model $ hexdata$ ""
         ++ "08 41 06 08"

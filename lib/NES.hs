@@ -41,16 +41,16 @@ intensify_blue_bit = bit 7 :: Word8
 
 ppu_status = 0x2002 :: Word16
 
-spr_address = 0x2003 :: Word16
+spr_addr = 0x2003 :: Word16
 spr_mem = 0x2004 :: Word16
 
 ppu_scroll = 0x2005 :: Word16
 
-ppu_address = 0x2006 :: Word16
-set_ppu_address w16 = do
+ppu_addr = 0x2006 :: Word16
+set_ppu_addr w16 = do
     lda ppu_status
-    high w16 ->* ppu_address
-    low w16 ->* ppu_address
+    high w16 ->* ppu_addr
+    low w16 ->* ppu_addr
 ppu_mem = 0x2007 :: Word16
 
 channel_env = (+ 0) :: Word16 -> Word16

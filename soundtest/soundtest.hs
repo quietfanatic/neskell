@@ -33,8 +33,8 @@ reset_section = mdo
 
      -- Set background color
     lda NES.ppu_status
-    0x3f ->* NES.ppu_address
-    0x00 ->* NES.ppu_address
+    0x3f ->* NES.ppu_addr
+    0x00 ->* NES.ppu_addr
     0x0f ->* NES.ppu_mem
 
      -- nmi for the sound
