@@ -6,7 +6,7 @@ import Data.Bits
 import qualified Data.ByteString as B
 import ASM
 import ASM6502
-import NES
+import qualified NES
 import Debug.Trace
 import qualified NES.ASoundEngine as S
 
@@ -23,25 +23,26 @@ square2_state = 0x98
     nmi <- startof nmi_section
     data_begin <- startof data_section
     fillto 65530 0xff
-    provide nmi_vector $ le16 nmi
-    provide reset_vector $ le16 reset
-    provide irq_vector $ le16 0
+    provide NES.nmi_vector $ le16 nmi
+    provide NES.reset_vector $ le16 reset
+    provide NES.irq_vector $ le16 0
     return data_begin
+
 reset_section = mdo
-    initialize
+    NES.initialize
 
      -- Set background color
-    lda ppu_status
-    0x3f ->* ppu_address
-    0x00 ->* ppu_address
-    0x0f ->* ppu_mem
+    lda NES.ppu_status
+    0x3f ->* NES.ppu_address
+    0x00 ->* NES.ppu_address
+    0x0f ->* NES.ppu_mem
 
      -- nmi for the sound
-    ppu_ctrl *<- ppu_enable_nmi
-    ppu_mask *<- 0
+    NES.ppu_ctrl *<- NES.ppu_enable_nmi
+    NES.ppu_mask *<- 0
 
      -- enable sound
-    0x03 ->* apu_flags  -- 00000011
+    0x03 ->* NES.apu_flags  -- 00000011
 
     S.init_sound_engine NES.square1 square1_state square1_program 0x30
     S.init_sound_engine NES.square2 square2_state square2_program 0x30
