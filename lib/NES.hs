@@ -40,6 +40,9 @@ intensify_green_bit = bit 6 :: Word8
 intensify_blue_bit = bit 7 :: Word8
 
 ppustatus = 0x2002 :: Word16
+sprite_overflow_bit = bit 5 :: Word8
+sprite_0_hit_but = bit 6 :: Word8
+vblank_bit = bit 7 :: Word8
 
 oamaddr = 0x2003 :: Word16
 oamdata = 0x2004 :: Word16
@@ -54,35 +57,49 @@ set_ppuaddr w16 = do
 ppudata = 0x2007 :: Word16
 
 channel_env = (+ 0) :: Word16 -> Word16
+channel_sweep = (+ 1) :: Word16 -> Word16
 channel_low = (+ 2) :: Word16 -> Word16
 channel_high = (+ 3) :: Word16 -> Word16
 
-square1 = 0x4000 :: Word16
-square2 = 0x4004 :: Word16
+pulse1 = 0x4000 :: Word16
+pulse2 = 0x4004 :: Word16
+triangle = 0x4008 :: Word16
+noise = 0x400c :: Word16
 
-square1_env = 0x4000 :: Word16
-square1_low = 0x4002 :: Word16
-square1_high = 0x4003 :: Word16
-square2_env = 0x4004 :: Word16
-square2_low = 0x4006 :: Word16
-square2_high = 0x4007 :: Word16
+pulse1_env = 0x4000 :: Word16
+pulse1_sweep = 0x4001 :: Word16
+pulse1_low = 0x4002 :: Word16
+pulse1_high = 0x4003 :: Word16
+pulse2_env = 0x4004 :: Word16
+pulse2_sweep = 0x4005 :: Word16
+pulse2_low = 0x4006 :: Word16
+pulse2_high = 0x4007 :: Word16
+triangle1_env = 0x4008 :: Word16
+triangle1_low = 0x400a :: Word16
+triangle1_high = 0x400b :: Word16
+
+dmc_flags = 0x4010 :: Word16
+loop_sample_bit = bit 6 :: Word8
+enable_dmc_irq_bit = bit 7 :: Word8
 
 sprite_dma = 0x4014 :: Word16
 apuctrl = 0x4015 :: Word16
 controller1 = 0x4016 :: Word16
 controller2 = 0x4017 :: Word16
 apumode = 0x4017 :: Word16
+disable_frame_irq_bit = bit 6 :: Word8
+sequencer_mode_bit = bit 7 :: Word8
 
 initialize_begin = do
     sei
     cld
-    0x40 ->* apumode  -- disable apu frame irq
+    disable_frame_irq_bit ->* apumode
     ldxi 0xff
     txs        -- make stack
     inx
     stx ppuctrl  -- disable nmi
     stx ppumask  -- disable rendering
-    stx 0x4010  -- disable dmc irqs
+    stx dmc_flags  -- disable dmc irqs
 
      -- wait for first vblank
     rep bpl (bitm ppustatus)
