@@ -14,8 +14,8 @@ main = do
     B.putStr $ NES.header 0x01 0x00 0x00 0x00
     B.putStr $ prgbank
 
-square1_state = 0x90
-square2_state = 0x98
+
+sndstate = 0x90
 
 (prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
@@ -42,16 +42,14 @@ reset_section = mdo
      -- enable sound
     0x03 ->* NES.apuctrl  -- 00000011
 
-    S.init_sound_engine NES.square1 square1_state square1_program 0x30
-    S.init_sound_engine NES.square2 square2_state square2_program 0x30
+    S.init_sound_engine sndstate square1_program square2_program 0x30
 
     idle <- here
     jmp idle
 
 nmi_section = mdo
 
-    S.sound_engine NES.square1 square1_state note_table 0x33
-    S.sound_engine NES.square2 square2_state note_table 0x32
+    S.sound_engine sndstate note_table
 
     rti
 
