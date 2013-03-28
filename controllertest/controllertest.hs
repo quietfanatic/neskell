@@ -57,13 +57,18 @@ sprites_left = 0x0f
  -- That's original, right?
 
 ball_x = 0x10
-ball_xscreen = 0x11
-ball_y = 0x12
-camera_x = 0x13
-camera_xscreen = 0x14
+ball_y = 0x11
+ball_xscreen = 0x12
+ball_yscreen = 0x13
+camera_x = 0x14
 camera_y = 0x15
-ball_screen_x = 0x16
-ball_screen_y = 0x17
+camera_xscreen = 0x16
+camera_yscreen = 0x17
+ball_screen_x = 0x18
+ball_screen_y = 0x19
+
+xcoord = 0x00
+ycoord = 0x01
 
 init_ball = mdo
     ldai 0x80
@@ -76,23 +81,29 @@ init_ball = mdo
 --    sta bg_y
 
 move_ball = mdo
-    let move bit bump ball thr branch camera unbump screen = mdo
+    let bump GT = inc
+        bump LT = dec
+        unbump GT = dec
+        unbump LT = inc
+        branch GT = bcc
+        branch LT = bcs
+        move bit coord dir thr = mdo
             lda input1
             andi bit
             skip beq $ do
-                bump ball
-                lda ball
+                bump dir (ball_x + coord)
+                lda (ball_x + coord)
                 sec
-                sbc camera
-                sta screen
+                sbc (camera_x + coord)
+                sta (ball_screen_x + coord)
                 cmpi thr
-                skip branch $ do
-                    bump camera
-                    unbump screen
-    move btn_left  dec ball_x 0x40 bcs camera_x inc ball_screen_x
-    move btn_right inc ball_x 0xc1 bcc camera_x dec ball_screen_x
-    move btn_up    dec ball_y 0x40 bcs camera_y inc ball_screen_y
-    move btn_down  inc ball_y 0xb1 bcc camera_y dec ball_screen_y
+                skip (branch dir) $ do
+                    bump dir (camera_x + coord)
+                    unbump dir (ball_screen_x + coord)
+    move btn_left  xcoord LT 0x40
+    move btn_right xcoord GT 0xc1
+    move btn_up    ycoord LT 0x40
+    move btn_down  ycoord GT 0xb1
 
 
 draw_ball = do
