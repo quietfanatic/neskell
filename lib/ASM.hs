@@ -75,27 +75,27 @@ hex _ = error "Odd number of hex digits in hexdata string."
 hexdata :: Num ctr => String -> ASM ctr ()
 hexdata = bytes . hex
 
-le16 :: (Num ctr, Show ctr) => Word16 -> ASM ctr ()
+le16 :: Integral ctr => Word16 -> ASM ctr ()
 le16 w = do
     byte$ fromIntegral w
     byte$ fromIntegral (shiftR w 8)
-be16 :: (Num ctr, Show ctr) => Word16 -> ASM ctr ()
+be16 :: Integral ctr => Word16 -> ASM ctr ()
 be16 w = do
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral w
-le32 :: (Num ctr, Show ctr) => Word32 -> ASM ctr ()
+le32 :: Integral ctr => Word32 -> ASM ctr ()
 le32 w = do
     byte$ fromIntegral w
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral (shiftR w 16)
     byte$ fromIntegral (shiftR w 24)
-be32 :: (Num ctr, Show ctr) => Word32 -> ASM ctr ()
+be32 :: Integral ctr => Word32 -> ASM ctr ()
 be32 w = do
     byte$ fromIntegral (shiftR w 24)
     byte$ fromIntegral (shiftR w 16)
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral w
-le64 :: (Num ctr, Show ctr) => Word64 -> ASM ctr ()
+le64 :: Integral ctr => Word64 -> ASM ctr ()
 le64 w = do
     byte$ fromIntegral w
     byte$ fromIntegral (shiftR w 8)
@@ -105,7 +105,7 @@ le64 w = do
     byte$ fromIntegral (shiftR w 40)
     byte$ fromIntegral (shiftR w 48)
     byte$ fromIntegral (shiftR w 56)
-be64 :: (Num ctr, Show ctr) => Word64 -> ASM ctr ()
+be64 :: Integral ctr => Word64 -> ASM ctr ()
 be64 w = do
     byte$ fromIntegral (shiftR w 56)
     byte$ fromIntegral (shiftR w 48)
@@ -115,13 +115,13 @@ be64 w = do
     byte$ fromIntegral (shiftR w 16)
     byte$ fromIntegral (shiftR w 8)
     byte$ fromIntegral w
-lefloat :: (Num ctr, Show ctr) => Float -> ASM ctr ()
+lefloat :: Integral ctr => Float -> ASM ctr ()
 lefloat = le32 . unsafeCoerce
-befloat :: (Num ctr, Show ctr) => Float -> ASM ctr ()
+befloat :: Integral ctr => Float -> ASM ctr ()
 befloat = be32 . unsafeCoerce
-ledouble :: (Num ctr, Show ctr) => Double -> ASM ctr ()
+ledouble :: Integral ctr => Double -> ASM ctr ()
 ledouble = le32 . unsafeCoerce
-bedouble :: (Num ctr, Show ctr) => Double -> ASM ctr ()
+bedouble :: Integral ctr => Double -> ASM ctr ()
 bedouble = be32 . unsafeCoerce
 
 
@@ -148,14 +148,14 @@ sizeof x = do
     end <- here
     return (end - start)
 
-rep :: Show ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
+rep :: Integral ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
 rep branch code = mdo
     start <- here
     res <- code
     branch start
     return res
 
-repfor :: Show ctr => ASM ctr () -> (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
+repfor :: Integral ctr => ASM ctr () -> (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
 repfor init branch code = mdo
     init
     start <- here
@@ -163,7 +163,7 @@ repfor init branch code = mdo
     branch start
     return res
 
-skip :: Show ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
+skip :: Integral ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
 skip branch code = mdo
     branch end
     res <- code
@@ -197,14 +197,14 @@ type Allocation64 = Allocation Word64
 allocate64 :: Integral a => Word64 -> [a] -> [Allocation64]
 allocate64 = allocate
 
-provide :: (Num ctr, Eq ctr, Show ctr) => Allocation ctr -> ASM ctr a -> ASM ctr a
+provide :: Integral ctr => Allocation ctr -> ASM ctr a -> ASM ctr a
 provide res code = mdo
     enforce_counter (start res)
     ret <- code
     enforce_counter (end res)
     return ret
 
-provide_at :: (Num ctr, Eq ctr, Show ctr) => ctr -> Allocation ctr -> ASM ctr a -> ASM ctr a
+provide_at :: Integral ctr => ctr -> Allocation ctr -> ASM ctr a -> ASM ctr a
 provide_at off res code = mdo
     enforce_counter (start res + off)
     ret <- code

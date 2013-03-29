@@ -10,79 +10,87 @@ import ASM6502
 import NES
 
 square1 = 0x00
-square2 = 0x08
+square2 = 0x04
+triangle = 0x08
+noise = 0x0c
 
-datasize = 0x10
+datasize = 0x20
 
-chn_program = (+ 0)
-chn_pos = (+ 2)
-chn_timer = (+ 4)
+ -- Data is laid out in fours to match the NES channels
+ -- 11112222ttttnnnn11--22--tt--nn--
+program (Allocation x _) = x + 0x00
+position (Allocation x _) = x + 0x02
+timer (Allocation x _) = x + 0x10
 
 validate (Allocation _ s) cont = if s == datasize
     then cont
     else error$ "Sound engine was given an allocation of the wrong size (" ++ show s ++ " /= " ++ show datasize ++ ")"
 
 init engine = validate engine $ mdo
-    let init_part nesch ch = do
-        0x00 ->* chn_pos ch
-        0x01 ->* chn_timer ch
-        0x20 ->* channel_env nesch
-    init_part NES.pulse1 (start engine + square1)
-    init_part NES.pulse2 (start engine + square2)
+    let init_part chn = do
+        0x00 ->* program engine + chn
+        0x01 ->* timer engine + chn
+        0x00 ->* (NES.channel_env (NES.channels + chn))
+    init_part square1
+    init_part square2
 
 set_program engine chn prog = validate engine $ do
     ldai (low prog)
-    sta (chn_program (start engine + chn))
-    sta (chn_pos (start engine + chn))
+    sta (program engine + chn)
+    sta (position engine + chn)
     ldai (high prog)
-    sta (chn_program (start engine + chn) + 1)
-    sta (chn_pos (start engine + chn) + 1)
+    sta (program engine + chn + 1)
+    sta (position engine + chn + 1)
 
 run engine note_table = mdo
-    let pos = 0x00  -- 0x00 stays 0 (the "real" pointer is y:0x01)
+     -- X is always the channel offset (0, 4, 8, or c)
+     -- Y is either the low end of pos or the note index.
+    let eprogram = program engine
+        eposition = position engine
+        etimer = timer engine
+        pos = 0x00  -- 0x00 stays 0 (the "real" pointer is y:0x01)
+        tmpy = 0x02
         next = do
             iny
             skip bne (inc (pos + 1))
-        run_part nesch ch = mdo
-            dec (chn_timer ch)
-            skip bne $ mdo
-                ldy (chn_pos ch)
-                pos + 1 *<-* chn_pos ch + 1
-                read_note <- here
-                ldayp pos
-                bmi special
-                note <- startof$ mdo
-                    asla
-                    tax
-                    ldax note_table
-                    sta (NES.channel_low nesch)
-                    ldax (start note_table + 1)
-                    sta (NES.channel_high nesch)
+    ldxi 0x00
+    run_one <- startof$ mdo
+        decx etimer
+        skip bne $ mdo
+            ldyx eposition
+            ldax (eposition + 1) >> sta (pos + 1)
+            read_note <- here
+            ldayp pos
+            bmi special
+            note <- startof$ mdo
+                sty tmpy
+                asla
+                tay
+                lday note_table >> stax (NES.channel_low NES.channels)
+                lday (start note_table + 1) >> stax (NES.channel_high NES.channels)
+                ldy tmpy
+                next
+                ldayp pos >> stax etimer
+                next
+                jmp done_sound
+            special <- startof$ mdo
+                next
+                cmpi repeat_code >> beq do_repeat
+                cmpi set_env_code >> beq do_set_env
+                do_repeat <- startof$ mdo
+                    ldax eprogram >> sta pos
+                    ldax (eprogram + 1) >> sta (pos + 1)
+                    jmp read_note
+                do_set_env <- startof$ mdo
+                    ldayp pos >> stax (NES.channel_env NES.channels)
                     next
-                    ldayp pos
-                    sta (chn_timer ch)
-                    next
-                    jmp done_sound
-                special <- startof$ mdo
-                    next
-                    cmpi repeat_code >> beq do_repeat
-                    cmpi set_env_code >> beq do_set_env
-                    do_repeat <- startof$ mdo
-                        chn_program ch *->* pos
-                        chn_program ch + 1 *->* pos + 1
-                        jmp read_note
-                    do_set_env <- startof$ mdo
-                        ldayp pos
-                        sta (NES.channel_env nesch)
-                        next
-                        jmp read_note
-                    nothing
-                done_sound <- here
-                sty (chn_pos ch)
-                pos + 1 *->* chn_pos ch + 1
-    run_part NES.pulse1 (start engine + square1)
-    run_part NES.pulse2 (start engine + square2)
-
+                    jmp read_note
+                nothing
+            done_sound <- here
+            styx eposition
+            lda (pos + 1) >> stax (eposition + 1)
+    inx >> inx >> inx >> inx
+    skip (cpxi 0x08 >>. beq) (jmp run_one)
 
 repeat_code : set_env_code : _ = [0x80..] :: [Word8]
 

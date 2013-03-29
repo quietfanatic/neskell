@@ -61,6 +61,7 @@ channel_sweep = (+ 1) :: Word16 -> Word16
 channel_low = (+ 2) :: Word16 -> Word16
 channel_high = (+ 3) :: Word16 -> Word16
 
+channels = 0x4000 :: Word16
 pulse1 = 0x4000 :: Word16
 pulse2 = 0x4004 :: Word16
 triangle = 0x4008 :: Word16

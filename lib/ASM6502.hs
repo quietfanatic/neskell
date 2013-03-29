@@ -9,6 +9,7 @@ import qualified Data.Bits as B
 import qualified Data.Sequence as S
 import Assembly
 import ASM
+import Text.Printf
 
 type ASM6502 a = ASM Word16 a
 
@@ -22,7 +23,7 @@ op8 a x = byte a >> Assembly f where
     f start = let
         res = case no_overflow x :: Maybe Word8 of
             Just w8 -> S.singleton w8
-            Nothing -> error$ "Overflow error in op8 (" ++ show x ++ ")"
+            Nothing -> error$ printf "Overflow error in op8 (0x%x)" (toInteger x)
         in (res, start + 1, ())
 
 op16 :: (Integral x, Show x) => Word8 -> x -> ASM6502 ()
@@ -32,7 +33,7 @@ op16 a x = byte a >> Assembly f where
             Just w8 -> fromIntegral w8
             Nothing -> case no_overflow x :: Maybe Word16 of
                 Just w16 -> w16
-                Nothing -> error$ "Overflow error in op16 (" ++ show x ++ ")"
+                Nothing -> error$ printf "Overflow error in op16 (0x%x)" (toInteger x)
         res = S.singleton (fromIntegral res16) S.>< S.singleton (fromIntegral (B.shiftR res16 8))
         in (res, start + 2, ())
 
@@ -56,7 +57,7 @@ op8or16' max a b x = case toInteger max of
         Just w8 -> byte a >> byte w8
         Nothing -> case no_overflow x of
             Just w16 -> byte b >> le16 w16
-            Nothing -> fail$ "Overflow error in op8or16 (" ++ show x ++ ")"
+            Nothing -> fail$ printf "Overflow error in op8or16 (0x%x)" (toInteger x)
 
  -- HACK HACK HACK
 instance Bounded Integer where
@@ -70,7 +71,7 @@ rel8 b x = byte b >> Assembly f where
         off = fromIntegral x - fromIntegral (start + 1)
         res = case no_overflow off :: Maybe Int8 of
             Just i8 -> S.singleton (fromIntegral i8)
-            Nothing -> fail$ "Overflow error in relative calculation (" ++ show off ++ ")"
+            Nothing -> fail$ printf "Overflow error in relative calculation (0x%x)" (toInteger off)
         in (res, start + 1, ())
 
 adci :: (Integral a, Show a) => a -> ASM6502 ()

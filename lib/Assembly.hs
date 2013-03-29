@@ -4,6 +4,7 @@ module Assembly (Assembly(..), assemble, nothing, here, unit, units, pad_assembl
 import Data.Monoid
 import qualified Data.Foldable as F
 import Control.Monad.Fix
+import Text.Printf
 
 newtype Assembly mon ctr a = Assembly (ctr -> (mon, ctr, a))
 
@@ -27,20 +28,18 @@ pad_assembly size filling (Assembly code) = Assembly f where
     f start = let
         (coderes, finish, ret) = code start
         res = if finish > start + size
-            then error$ "Code given to pad_assembly was larger than the alloted size ("
-                     ++ show (toInteger finish) ++ " - "
-                     ++ show (toInteger start) ++ " > "
-                     ++ show (toInteger size) ++ ")."
+            then error$ printf "Code given to pad_assembly was larger than the alloted size (0x%x - 0x%x > 0x%x)"
+                               (toInteger finish) (toInteger start) (toInteger size)
             else coderes <> F.fold (replicate (fromIntegral (start + size - finish)) filling)
         in (res, start + size, ret)
 
 return_assembly :: Monoid mon => a -> Assembly mon ctr a
 return_assembly x = Assembly (\c -> (mempty, c, x))
 
-fail_assembly :: Show ctr => String -> Assembly mon ctr a
+fail_assembly :: Integral ctr => String -> Assembly mon ctr a
 fail_assembly mess = Assembly f where
     f start = let
-        err = error$ mess ++ " at " ++ show start
+        err = error$ printf "%s at 0x%x" mess (toInteger start)
         in (err, start, err)  -- Don't be strict.
 
 append_assembly :: Monoid mon => Assembly mon ctr a -> Assembly mon ctr b -> Assembly mon ctr b
@@ -68,19 +67,19 @@ fix_assembly f = Assembly g where
 set_counter :: (Monoid mon) => ctr -> Assembly mon ctr ()
 set_counter new = Assembly (\_ -> (mempty, new, ()))
 
-enforce_counter :: (Monoid mon, Show ctr, Num ctr, Eq ctr) => ctr -> Assembly mon ctr ()
+enforce_counter :: (Monoid mon, Integral ctr) => ctr -> Assembly mon ctr ()
 enforce_counter expected = Assembly f where
     f got = let
         res = if got == expected
             then mempty
-            else error$ "Something was misaligned (counter was " ++ show got ++ " instead of " ++ show expected ++ ")"
+            else error$ printf "Something was misaligned (0x%x /= 0x%x)" (toInteger got) (toInteger expected)
         in (res, expected, ())
 
-instance (Monoid mon, Show ctr) => Monad (Assembly mon ctr) where
+instance (Monoid mon, Integral ctr) => Monad (Assembly mon ctr) where
     return = return_assembly
     (>>=) = bind_assembly
     (>>) = append_assembly
     fail = fail_assembly
 
-instance (Monoid mon, Show ctr) => MonadFix (Assembly mon ctr) where
+instance (Monoid mon, Integral ctr) => MonadFix (Assembly mon ctr) where
     mfix = fix_assembly
