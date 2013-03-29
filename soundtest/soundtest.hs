@@ -40,11 +40,13 @@ reset_section = mdo
     NES.ppumask *<- 0
 
      -- enable sound
-    NES.apuctrl *<- NES.enable_pulse1 .|. NES.enable_pulse2
+    NES.apuctrl *<- NES.enable_pulse1 .|. NES.enable_pulse2 .|. NES.enable_triangle
+    NES.apumode *<- NES.sequencer_mode_bit .|. NES.disable_frame_irq_bit
 
     S.init sound
     S.set_program sound NES.pulse1 pulse1_program
     S.set_program sound NES.pulse2 pulse2_program
+    S.set_program sound NES.triangle triangle_program
 
     idle <- here
     jmp idle
@@ -55,8 +57,8 @@ nmi_section = mdo
 
     rti
 
-[note_table, pulse1_program, pulse2_program]
-    = allocate16 data_begin [2 * 0x5f, length pulse1_program', length pulse2_program']
+[note_table, pulse1_program, pulse2_program, triangle_program]
+    = allocate16 data_begin [2 * 0x5f, length pulse1_program2, length pulse2_program2, length triangle_program2]
 
  -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
  -- but a couple tweaks may have been made to sharpen notes up a little
@@ -80,8 +82,33 @@ pulse2_program' = S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|.
     ++ hex "1080 1280 1480 1280"
     ++ S.repeat
 
+pulse1_program2 = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
+    ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004"
+    ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004"
+    ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
+    ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
+    ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
+    ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
+    ++ S.repeat
+pulse2_program2 = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
+    ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
+    ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
+    ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
+    ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
+    ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
+    ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
+    ++ S.repeat
+triangle_program2 = S.set_env 0x81
+    ++ hex "00c0 00c0"
+    ++ hex "0030 1412 1912 1c06 0006 1c24 1330 000c"
+    ++ hex "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
+    ++ hex "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
+    ++ S.repeat
+
+
 data_section = mdo
     provide note_table $ sequence $ map le16 $ note_table'
-    provide pulse1_program $ bytes pulse1_program'
-    provide pulse2_program $ bytes pulse2_program'
+    provide pulse1_program $ bytes pulse1_program2
+    provide pulse2_program $ bytes pulse2_program2
+    provide triangle_program $ bytes triangle_program2
 

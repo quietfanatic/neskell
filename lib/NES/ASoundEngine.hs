@@ -29,6 +29,7 @@ init engine = validate engine $ mdo
         0x00 ->* NES.chn_env + chn
     init_part NES.pulse1
     init_part NES.pulse2
+    init_part NES.triangle
 
 set_program engine chn prog = validate engine $ do
     ldai (low prog)
@@ -62,8 +63,11 @@ run engine note_table = mdo
                 sty tmpy
                 asla
                 tay
-                lday note_table >> stax NES.chn_low
-                lday (start note_table + 1) >> stax NES.chn_high
+                lday note_table
+                stax NES.chn_low
+                lday (start note_table + 1)
+                orai 0xf8
+                stax NES.chn_high
                 ldy tmpy
                 next
                 ldayp pos >> stax etimer
@@ -87,7 +91,7 @@ run engine note_table = mdo
             stax eposition
             lda (pos + 1) >> stax (eposition + 1)
     inx >> inx >> inx >> inx
-    skip (cpxi 0x08 >>. beq) (jmp run_one)
+    skip (cpxi 0x0c >>. beq) (jmp run_one)
 
 repeat_code : set_env_code : _ = [0x80..] :: [Word8]
 
