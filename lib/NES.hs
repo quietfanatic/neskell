@@ -18,7 +18,7 @@ header prgs chrs mapper flags = let asc = fromIntegral . ord in B.pack [
     0, 0, 0, 0, 0, 0, 0, 0
         ]
 
- -- The names of various memory-mapped ports
+ -- PPU PORTS
 
 ppuctrl = 0x2000 :: Word16
 nametable_x_bit = bit 0 :: Word8
@@ -56,16 +56,33 @@ set_ppuaddr w16 = do
     low w16 ->* ppuaddr
 ppudata = 0x2007 :: Word16
 
-channel_env = (+ 0) :: Word16 -> Word16
-channel_sweep = (+ 1) :: Word16 -> Word16
-channel_low = (+ 2) :: Word16 -> Word16
-channel_high = (+ 3) :: Word16 -> Word16
+sprite_dma = 0x4014 :: Word16
 
-channels = 0x4000 :: Word16
-pulse1 = 0x4000 :: Word16
-pulse2 = 0x4004 :: Word16
-triangle = 0x4008 :: Word16
-noise = 0x400c :: Word16
+ -- APU STUFF
+
+chn_env = 0x4000 :: Word16
+volume_bits = 0x3f :: Word8
+constant_volume = 0x10 :: Word8
+disable_length_counter = 0x20 :: Word8
+duty_bits = 0xc0 :: Word8
+duty_eighth = 0x00 :: Word8
+duty_quarter = 0x40 :: Word8
+duty_half = 0x80 :: Word8
+duty_inverted_quarter = 0xc0 :: Word8
+
+chn_sweep = 0x4001 :: Word16
+
+chn_low = 0x4002 :: Word16
+
+chn_high = 0x4003 :: Word16
+period_high_bits = 0x07 :: Word8
+length_counter_bits = 0xf8 :: Word8
+
+apuports = 0x4000 :: Word16
+pulse1 = 0x0 :: Word16  -- For some reason it's prematurely defaulting to Integer
+pulse2 = 0x4 :: Word16
+triangle = 0x8 :: Word16
+noise = 0xc :: Word16
 
 pulse1_env = 0x4000 :: Word16
 pulse1_sweep = 0x4001 :: Word16
@@ -83,8 +100,13 @@ dmc_flags = 0x4010 :: Word16
 loop_sample_bit = bit 6 :: Word8
 enable_dmc_irq_bit = bit 7 :: Word8
 
-sprite_dma = 0x4014 :: Word16
 apuctrl = 0x4015 :: Word16
+enable_pulse1 = bit 0 :: Word8
+enable_pulse2 = bit 1 :: Word8
+enable_triangle = bit 2 :: Word8
+enable_noise = bit 3 :: Word8
+enable_dmc = bit 4 :: Word8
+
 controller1 = 0x4016 :: Word16
 controller2 = 0x4017 :: Word16
 apumode = 0x4017 :: Word16

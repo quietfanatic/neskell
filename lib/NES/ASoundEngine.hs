@@ -9,11 +9,6 @@ import ASM
 import ASM6502
 import NES
 
-square1 = 0x00
-square2 = 0x04
-triangle = 0x08
-noise = 0x0c
-
 datasize = 0x20
 
  -- Data is laid out in fours to match the NES channels
@@ -27,12 +22,13 @@ validate (Allocation _ s) cont = if s == datasize
     else error$ "Sound engine was given an allocation of the wrong size (" ++ show s ++ " /= " ++ show datasize ++ ")"
 
 init engine = validate engine $ mdo
-    let init_part chn = do
+    let init_part :: Word16 -> ASM6502 ()
+        init_part chn = do
         0x00 ->* program engine + chn
         0x01 ->* timer engine + chn
-        0x00 ->* (NES.channel_env (NES.channels + chn))
-    init_part square1
-    init_part square2
+        0x00 ->* NES.chn_env + chn
+    init_part NES.pulse1
+    init_part NES.pulse2
 
 set_program engine chn prog = validate engine $ do
     ldai (low prog)
@@ -66,8 +62,8 @@ run engine note_table = mdo
                 sty tmpy
                 asla
                 tay
-                lday note_table >> stax (NES.channel_low NES.channels)
-                lday (start note_table + 1) >> stax (NES.channel_high NES.channels)
+                lday note_table >> stax NES.chn_low
+                lday (start note_table + 1) >> stax NES.chn_high
                 ldy tmpy
                 next
                 ldayp pos >> stax etimer
@@ -82,7 +78,7 @@ run engine note_table = mdo
                     ldax (eprogram + 1) >> sta (pos + 1)
                     jmp read_note
                 do_set_env <- startof$ mdo
-                    ldayp pos >> stax (NES.channel_env NES.channels)
+                    ldayp pos >> stax NES.chn_env
                     next
                     jmp read_note
                 nothing
