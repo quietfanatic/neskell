@@ -15,7 +15,7 @@ main = do
     B.putStr $ prgbank
 
 
-[sound] = allocate 0x90 [S.datasize]
+[sound] = allocate 0x300 [S.datasize]
 
 (prgbank, 0, data_begin) = asm 0 $ mdo
     set_counter 0xc000
@@ -70,12 +70,12 @@ note_table' = [                                                     0x0000, 0x07
     0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4c-0x57)
     0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16]                             -- c9-f#9 (0x58-0x5e)
 
-square1_program' = S.set_env 0x33
+square1_program' = S.set_env 0xf3
     ++ hex "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
     ++ hex "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
     ++ S.repeat
 
-square2_program' = S.set_env 0x32
+square2_program' = S.set_env 0xf2
     ++ hex "1480 1280 1040 1240 1480"
     ++ hex "1080 1280 1480 1280"
     ++ S.repeat
