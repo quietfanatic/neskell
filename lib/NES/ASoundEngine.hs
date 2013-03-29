@@ -18,7 +18,6 @@ chn_program = (+ 0)
 chn_pos = (+ 2)
 chn_timer = (+ 4)
 
-
 validate (Allocation _ s) cont = if s == datasize
     then cont
     else error$ "Sound engine was given an allocation of the wrong size (" ++ show s ++ " /= " ++ show datasize ++ ")"
@@ -32,50 +31,53 @@ init engine = validate engine $ mdo
     init_part NES.pulse2 (start engine + square2)
 
 set_program engine chn prog = validate engine $ do
-    low prog ->* start engine + chn
-    high prog ->* start engine + chn + 1
+    ldai (low prog)
+    sta (chn_program (start engine + chn))
+    sta (chn_pos (start engine + chn))
+    ldai (high prog)
+    sta (chn_program (start engine + chn) + 1)
+    sta (chn_pos (start engine + chn) + 1)
 
 run engine note_table = mdo
     let run_part nesch ch = mdo
-        let timer = chn_timer ch
-            pos = chn_pos ch
-            program = chn_program ch
-            env = NES.channel_env nesch
-            low = NES.channel_low nesch
-            high = NES.channel_high nesch
-        dec timer
+        let pos = chn_pos ch
+            next = do
+                inc pos
+                skip bne (inc (pos + 1))
+        dec (chn_timer ch)
         skip bne $ mdo
-            ldy pos
+            ldy 0
             read_note <- here
-            ldayp program
+            ldayp pos
             bmi special
             note <- startof$ mdo
                 asla
                 tax
                 ldax note_table
-                sta low
+                sta (NES.channel_low nesch)
                 ldax (start note_table + 1)
-                sta high
-                iny
-                ldayp program
-                sta timer
-                iny
+                sta (NES.channel_high nesch)
+                next
+                ldayp pos
+                sta (chn_timer ch)
+                next
                 jmp done_sound
             special <- startof$ mdo
-                iny
+                next
                 cmpi repeat_code >> beq do_repeat
                 cmpi set_env_code >> beq do_set_env
                 do_repeat <- startof$ mdo
-                    ldyi 0x00
+                    chn_program ch *->* pos
+                    chn_program ch + 1 *->* pos + 1
                     jmp read_note
                 do_set_env <- startof$ mdo
-                    ldayp program
-                    sta env
-                    iny
+                    ldayp pos
+                    sta (NES.channel_env nesch)
+                    next
                     jmp read_note
                 nothing
             done_sound <- here
-            sty pos
+            nothing
     run_part NES.pulse1 (start engine + square1)
     run_part NES.pulse2 (start engine + square2)
 
