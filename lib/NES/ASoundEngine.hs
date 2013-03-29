@@ -87,7 +87,8 @@ run engine note_table = mdo
                     jmp read_note
                 nothing
             done_sound <- here
-            styx eposition
+            tya
+            stax eposition
             lda (pos + 1) >> stax (eposition + 1)
     inx >> inx >> inx >> inx
     skip (cpxi 0x08 >>. beq) (jmp run_one)
