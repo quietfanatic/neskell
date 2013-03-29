@@ -70,12 +70,12 @@ note_table' = [                                                     0x0000, 0x07
     0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4c-0x57)
     0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16]                             -- c9-f#9 (0x58-0x5e)
 
-square1_program' = []
+square1_program' = S.set_env 0x33
     ++ hex "4020 4022 4023 4027 4025 2023 2022 1c20 0400 1020 101e 341b 0c00"
     ++ hex "4020 4023 4022 401e 5420 0c00 2027 6425 1c00"
     ++ S.repeat
 
-square2_program' = []
+square2_program' = S.set_env 0x32
     ++ hex "8014 8012 4010 4012 8014"
     ++ hex "8010 8012 8014 8012"
     ++ S.repeat

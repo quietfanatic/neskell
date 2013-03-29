@@ -36,7 +36,7 @@ set_program engine chn prog = validate engine $ do
     high prog ->* start engine + chn + 1
 
 run engine note_table = mdo
-    let run_part nesch ch default_env = mdo
+    let run_part nesch ch = mdo
         let timer = chn_timer ch
             pos = chn_pos ch
             program = chn_program ch
@@ -45,8 +45,8 @@ run engine note_table = mdo
             high = NES.channel_high nesch
         dec timer
         skip bne $ mdo
-            read_note <- here
             ldy pos
+            read_note <- here
             ldayp program
             beq special
             note <- startof$ mdo
@@ -59,25 +59,33 @@ run engine note_table = mdo
                 sta low
                 ldax (start note_table + 1)
                 sta high
-                default_env ->* env
                 iny
                 jmp done_sound
             special <- startof$ mdo
                 iny
                 ldayp program
-                beq repeat
+                beq do_repeat
+                cmpi 0x01
+                beq do_set_env
                 unknown <- startof$ mdo
                     iny
                     jmp read_note
-                repeat <- startof$ mdo
+                do_repeat <- startof$ mdo
                     iny
                     sta pos
+                    jmp read_note
+                do_set_env <- startof$ mdo
+                    iny
+                    ldayp program
+                    sta env
+                    iny
                     jmp read_note
                 nothing
             done_sound <- here
             sty pos
-    run_part NES.pulse1 (start engine + square1) 0x33
-    run_part NES.pulse2 (start engine + square2) 0x32
+    run_part NES.pulse1 (start engine + square1)
+    run_part NES.pulse2 (start engine + square2)
 
 repeat = hex "0000"
-
+set_env :: Word8 -> [Word8]
+set_env val = hex "0001" ++ [val]
