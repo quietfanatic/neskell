@@ -64,7 +64,9 @@ run engine note_table = mdo
                 iny
                 jmp done_sound
             rest <- startof$ mdo
-                0x30 ->* env
+                ldai 0x00
+                sta low
+                sta high
                 iny
                 jmp done_sound
             special <- startof$ mdo
