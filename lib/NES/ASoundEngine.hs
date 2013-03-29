@@ -16,6 +16,7 @@ datasize = 0x20
 program (Allocation x _) = x + 0x00
 position (Allocation x _) = x + 0x02
 timer (Allocation x _) = x + 0x10
+repeat_counter (Allocation x _) = x + 0x12
 
 validate (Allocation _ s) cont = if s == datasize
     then cont
@@ -26,6 +27,7 @@ init engine = validate engine $ mdo
         init_part chn = do
         0x00 ->* program engine + chn
         0x01 ->* timer engine + chn
+        0x00 ->* repeat_counter engine + chn
         0x00 ->* NES.chn_env + chn
     init_part NES.pulse1
     init_part NES.pulse2
@@ -45,15 +47,17 @@ run engine note_table = mdo
     let eprogram = program engine
         eposition = position engine
         etimer = timer engine
+        reps = repeat_counter engine
         pos = 0x00  -- 0x00 stays 0 (the "real" pointer is y:0x01)
         tmpy = 0x02
         next = do
             iny
-            skip bne (inc (pos + 1))
+            skip bne (incx (pos + 1))
     ldxi 0x00
     run_one <- startof$ mdo
         decx etimer
-        skip bne $ mdo
+        skip beq (jmp just_wait)
+        just_wait <- endof$ mdo
             ldyx eposition
             ldax (eposition + 1) >> sta (pos + 1)
             read_note <- here
@@ -75,8 +79,28 @@ run engine note_table = mdo
                 jmp done_sound
             special <- startof$ mdo
                 next
+                cmpi loop_code >> beq do_loop
                 cmpi repeat_code >> beq do_repeat
                 cmpi set_env_code >> beq do_set_env
+                do_loop <- startof$ mdo
+                    ldax reps >> bne skip_start_loop
+                    ldayp pos  -- reps is zero; start loop
+                    beq infiloop  -- If the program says zero reps it means infinite
+                    stax reps
+                    skip_start_loop <- here
+                    next
+                    decx reps >> beq skip_goto
+                    do_goto <- here
+                    tya  -- reps is non-zero or loop is infitie
+                    sec
+                    sbcyp pos >> skip bcs (decx (pos + 1))
+                    tay
+                    skip_goto <- here
+                    next
+                    jmp read_note
+                    infiloop <- here
+                    next
+                    jmp do_goto
                 do_repeat <- startof$ mdo
                     ldyx eprogram
                     ldax (eprogram + 1) >> sta (pos + 1)
@@ -90,10 +114,12 @@ run engine note_table = mdo
             tya
             stax eposition
             lda (pos + 1) >> stax (eposition + 1)
+        nothing
     inx >> inx >> inx >> inx
     skip (cpxi 0x0c >>. beq) (jmp run_one)
 
-repeat_code : set_env_code : _ = [0x80..] :: [Word8]
+loop_code : repeat_code : set_env_code : _ = [0x80..] :: [Word8]
 
+loop times offset = [loop_code, times, offset]
 repeat = [repeat_code]
 set_env val = [set_env_code, val]
