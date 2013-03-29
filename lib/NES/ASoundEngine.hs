@@ -23,11 +23,11 @@ validate (Allocation _ s) cont = if s == datasize
     then cont
     else error$ "Sound engine was given an allocation of the wrong size (" ++ show s ++ " /= " ++ show datasize ++ ")"
 
-init engine default_env = validate engine $ mdo
+init engine = validate engine $ mdo
     let init_part nesch ch = do
         0x00 ->* chn_pos ch
         0x04 ->* chn_timer ch
-        default_env ->* channel_env nesch
+        0x30 ->* channel_env nesch
     init_part NES.pulse1 (start engine + square1)
     init_part NES.pulse2 (start engine + square2)
 

@@ -42,7 +42,7 @@ reset_section = mdo
      -- enable sound
     0x03 ->* NES.apuctrl  -- 00000011
 
-    S.init sound 0x30
+    S.init sound
     S.set_program sound S.square1 square1_program
     S.set_program sound S.square2 square2_program
 
