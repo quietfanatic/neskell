@@ -74,7 +74,7 @@ run engine note_table = mdo
                 cmpi repeat_code >> beq do_repeat
                 cmpi set_env_code >> beq do_set_env
                 do_repeat <- startof$ mdo
-                    ldax eprogram >> sta pos
+                    ldyx eprogram
                     ldax (eprogram + 1) >> sta (pos + 1)
                     jmp read_note
                 do_set_env <- startof$ mdo
