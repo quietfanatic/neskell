@@ -49,11 +49,10 @@ run engine note_table = mdo
             ldy pos
             ldayp program
             beq special
-            sta timer
-            iny
-            ldayp program
-            beq rest
-            tone <- startof$ mdo
+            note <- startof$ mdo
+                sta timer
+                iny
+                ldayp program
                 asla
                 tax
                 ldax note_table
@@ -61,12 +60,6 @@ run engine note_table = mdo
                 ldax (start note_table + 1)
                 sta high
                 default_env ->* env
-                iny
-                jmp done_sound
-            rest <- startof$ mdo
-                ldai 0x00
-                sta low
-                sta high
                 iny
                 jmp done_sound
             special <- startof$ mdo
