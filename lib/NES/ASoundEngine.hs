@@ -48,11 +48,8 @@ run engine note_table = mdo
             ldy pos
             read_note <- here
             ldayp program
-            beq special
+            bmi special
             note <- startof$ mdo
-                sta timer
-                iny
-                ldayp program
                 asla
                 tax
                 ldax note_table
@@ -60,22 +57,18 @@ run engine note_table = mdo
                 ldax (start note_table + 1)
                 sta high
                 iny
+                ldayp program
+                sta timer
+                iny
                 jmp done_sound
             special <- startof$ mdo
                 iny
-                ldayp program
-                beq do_repeat
-                cmpi 0x01
-                beq do_set_env
-                unknown <- startof$ mdo
-                    iny
-                    jmp read_note
+                cmpi repeat_code >> beq do_repeat
+                cmpi set_env_code >> beq do_set_env
                 do_repeat <- startof$ mdo
-                    iny
-                    sta pos
+                    ldyi 0x00
                     jmp read_note
                 do_set_env <- startof$ mdo
-                    iny
                     ldayp program
                     sta env
                     iny
@@ -86,6 +79,8 @@ run engine note_table = mdo
     run_part NES.pulse1 (start engine + square1)
     run_part NES.pulse2 (start engine + square2)
 
-repeat = hex "0000"
-set_env :: Word8 -> [Word8]
-set_env val = hex "0001" ++ [val]
+
+repeat_code : set_env_code : _ = [0x80..] :: [Word8]
+
+repeat = [repeat_code]
+set_env val = [set_env_code, val]
