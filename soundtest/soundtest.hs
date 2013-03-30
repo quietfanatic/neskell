@@ -116,7 +116,7 @@ data_end = asm triangle_stream2 nothing
 
 prgbank = asm data_end $ mdo
     fillto 0xfffa 0xff
-    provide NES.nmi $ le16 $ start nmi
-    provide NES.reset $ le16 $ start reset
+    provide NES.nmi $ le16 nmi
+    provide NES.reset $ le16 reset
     provide NES.irq $ le16 0
 

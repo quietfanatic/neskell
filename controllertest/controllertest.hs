@@ -283,8 +283,8 @@ data_end = asm data_section nothing
 
 prgbank_end = asm data_end $ mdo
     fillto 0xfffa 0xff
-    provide NES.nmi $ le16 $ start nmi
-    provide NES.reset $ le16 $ start reset
+    provide NES.nmi $ le16 nmi
+    provide NES.reset $ le16 reset
     provide NES.irq $ le16 0
 
 prgbank = asm prgbank_end nothing

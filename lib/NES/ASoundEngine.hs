@@ -149,7 +149,7 @@ run engine note_table = mdo
             next
             ldayp pos >> sta (command_ptr + 1)
             next
-            jsr (start call_sub)
+            jsr call_sub
             jmp read_commands
         call_sub <- section$ mdo
             jmpp command_ptr
