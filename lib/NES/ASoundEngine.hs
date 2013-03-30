@@ -11,19 +11,20 @@ import ASM6502
 import NES
 import Text.Printf
 
-datasize = 0x20
+engine_size = 0x20 :: Word16
 
  -- Data is laid out in fours to match the NES channels
  -- 11112222ttttnnnn11--22--tt--nn--
-engine_position (Allocation x _) = x + 0x00
-engine_timer (Allocation x _) = x + 0x02
-engine_reps (Allocation x _) = x + 0x10  -- Takes up two slots
+engine_position engine = start engine + 0x00
+engine_timer engine = start engine + 0x02
+engine_reps engine = start engine + 0x10  -- Takes up two slots
 
-validate (Allocation _ s) cont = if s == datasize
+validate :: Section6502 a -> b -> b
+validate engine cont = if size engine == engine_size
     then cont
-    else error$ "Sound engine was given an allocation of the wrong size (" ++ show s ++ " /= " ++ show datasize ++ ")"
+    else error$ printf "Sound engine was given an allocation of the wrong size (0x%x /= 0x%x)" (toInteger (size engine)) (toInteger engine_size)
 
-init :: Allocation Word16 -> ASM6502 ()
+init :: Section6502 a -> ASM6502 ()
 init engine = validate engine $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
@@ -39,7 +40,7 @@ set_stream engine chn stream = validate engine $ do
     ldai (high stream)
     sta (engine_position engine + chn + 1)
 
-run :: HasArea nt => Allocation Word16 -> nt Word16 -> ASM6502 ()
+run :: Section6502 a -> Section6502 b -> ASM6502 ()
 run engine note_table = mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.

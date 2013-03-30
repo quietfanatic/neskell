@@ -2,15 +2,14 @@
 {-# LANGUAGE RecursiveDo #-}
 
 module ASM (
-    ASM,
+    ASM, ASMSection,
     byte, bytes, ascii, bytestring, binfile, fill, fillto, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here,
     asm, asm_result, no_overflow, enforce_no_overflow,
     startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
-    Allocation(..), provide, provide_at,
-    allocate, allocate8, allocate16, allocate32, allocate64
+    allocate8, allocate16, allocate32, allocate64
 ) where
 
 import Data.Word
@@ -26,12 +25,13 @@ import Unsafe.Coerce  -- for serializing floats and doubles
 import System.IO.Unsafe  -- for binfile
 
 type ASM ctr a = Assembler (S.Seq Word8) ctr a
+type ASMSection ctr a = Section (S.Seq Word8) ctr a
 
-asm :: Num ctr => Assembly (S.Seq Word8) a ctr -> ASM ctr a -> Assembly (S.Seq Word8) a ctr
+asm :: Num ctr => ASMSection ctr a -> ASM ctr a -> ASMSection ctr a
 asm = assemble
 
-asm_result :: Assembly (S.Seq Word8) a ctr -> B.ByteString
-asm_result = B.pack . F.toList . assembly_result
+asm_result :: ASMSection ctr a -> B.ByteString
+asm_result = B.pack . F.toList . section_result
 
 byte :: Num ctr => Word8 -> ASM ctr ()
 byte = unit_assembler . S.singleton
@@ -177,77 +177,15 @@ skip branch code = mdo
 infixl 1 >>. 
 cmp >>. branch = (cmp >>) . branch
 
-
-data Allocation a = Allocation a a deriving (Show, Eq, Ord)
-allocation_start (Allocation x _) = x
-allocation_size (Allocation _ x) = x
-allocation_end (Allocation start size) = start + size
-instance HasArea Allocation where
-    start = allocation_start
-    size = allocation_size
-    end = allocation_end
-
-allocate :: (Num a, Integral b) => a -> [b] -> [Allocation a]
-allocate start [] = []
-allocate start (size:sizes) = Allocation start isize : allocate (start + isize) sizes where
-    isize = fromIntegral size
-
-type Allocation8 = Allocation Word8
-allocate8 :: Integral a => Word8 -> [a] -> [Allocation8]
+allocate8 :: Integral siz => ASMSection Word8 a -> [siz] -> [ASMSection Word8 b]
 allocate8 = allocate
-type Allocation16 = Allocation Word16
-allocate16 :: Integral a => Word16 -> [a] -> [Allocation16]
+
+allocate16 :: Integral siz => ASMSection Word16 a -> [siz] -> [ASMSection Word16 b]
 allocate16 = allocate
-type Allocation32 = Allocation Word32
-allocate32 :: Integral a => Word32 -> [a] -> [Allocation32]
+
+allocate32 :: Integral siz => ASMSection Word32 a -> [siz] -> [ASMSection Word32 b]
 allocate32 = allocate
-type Allocation64 = Allocation Word64
-allocate64 :: Integral a => Word64 -> [a] -> [Allocation64]
+
+allocate64 :: Integral siz => ASMSection Word64 a -> [siz] -> [ASMSection Word64 b]
 allocate64 = allocate
-
-provide :: Integral ctr => Allocation ctr -> ASM ctr a -> ASM ctr a
-provide res code = mdo
-    enforce_counter (start res)
-    ret <- code
-    enforce_counter (end res)
-    return ret
-
-provide_at :: Integral ctr => ctr -> Allocation ctr -> ASM ctr a -> ASM ctr a
-provide_at off res code = mdo
-    enforce_counter (start res + off)
-    ret <- code
-    enforce_counter (end res + off)
-    return ret
-
-instance (Num a, Eq a) => Monoid (Allocation a) where
-    mempty = Allocation 0 0
-    mappend a b = if end a == start b
-        then Allocation (start a) (size a + size b)
-        else error$ "Tried to merge resources that didn't match."
-
-instance Num a => Num (Allocation a) where
-    (+) = error$ "Can't (+) Allocation."
-    (*) = error$ "Can't (*) Allocation."
-    (-) = error$ "Can't (-) Allocation."
-    abs = error$ "Can't abs Allocation."
-    signum = error$ "Can't signum Allocation."
-    fromInteger x = Allocation (fromInteger x) 0
-
-instance Enum a => Enum (Allocation a) where
-    succ (Allocation st sz) = Allocation (succ st) sz
-    pred (Allocation st sz) = Allocation (pred st) sz
-    toEnum = error$ "Can't toEnum to get Allocation."
-    fromEnum = error$ "Can't fromEnum Allocation (you can toInteger it though."
-
-instance Real a => Real (Allocation a) where
-    toRational = toRational . start
-
-instance Integral a => Integral (Allocation a) where
-    quotRem = error$ "Can't quotRem Allocation.  It's only Integral for its toInteger."
-    toInteger (Allocation s _) = toInteger s
-
- -- Kinda icky but okay
-instance Bounded a => Bounded (Allocation a) where
-    minBound = Allocation minBound minBound
-    maxBound = Allocation maxBound maxBound
 

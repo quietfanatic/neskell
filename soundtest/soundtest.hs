@@ -16,7 +16,7 @@ main = do
     B.putStr $ asm_result prgbank
 
 [bg_color] = allocate8 0x10 [1]
-[sound] = allocate16 0x300 [S.datasize]
+[sound] = allocate16 0x300 [S.engine_size]
 
 prgbank_start = asm 0xc000 nothing
 

@@ -1,11 +1,12 @@
 
 module Assembly (
-    Assembly(..), assembly_start, assembly_size, assembly_end, assembly_result, assembly_return,
-    Assembler(..), assembler_function, assemble,
+    Section(..), section_start, section_size, section_end, section_result, section_return,
+    start, size, end,
+    Assembler(..), assembler_function, assemble, allocate,
     section, nothing, here, unit_assembler,
     pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
-    enforce_counter, trace_counter,
-    HasArea(..)
+    enforce_counter, provide, trace_counter,
+    section_merge
 ) where
 
 import Data.Int
@@ -16,32 +17,52 @@ import Control.Monad.Fix
 import Text.Printf
 import Debug.Trace
 
- -- Yes, a and ctr are reversed in these two types.
- -- The reason is Assembly needs to be HasArea and Assembler needs to be Monad
-data Assembly mon a ctr = Assembly ctr ctr mon (Maybe mon) (Maybe a)
-assembly_start (Assembly x _ _ _ _) = x
-assembly_size (Assembly s e _ _ _) = e - s
-assembly_end (Assembly _ x _ _ _) = x
-assembly_contents (Assembly _ _ x _ _) = x
-assembly_result (Assembly _ _ _ (Just x) _) = x
-assembly_result (Assembly _ _ _ Nothing _) = error$ "assembly_result called on an assembly that didn't have an associated result (e.g. one that was created from 'section')."
-assembly_return (Assembly _ _ _ _ (Just x)) = x
-assembly_return (Assembly _ _ _ _ Nothing) = error$ "assembly_return called on an assembly that didn't have an associated return value (e.g. one that was converted from an Integer)."
+data Section mon ctr a = Section ctr ctr mon mon a
+section_start :: Section mon ctr a -> ctr
+section_start (Section x _ _ _ _) = x
+start :: Section mon ctr a -> ctr
+start = section_start
+section_size :: Num ctr => Section mon ctr a -> ctr
+section_size (Section s e _ _ _) = e - s
+size :: Num ctr => Section mon ctr a -> ctr
+size = section_size
+section_end :: Section mon ctr a -> ctr
+section_end (Section _ x _ _ _) = x
+end :: Section mon ctr a -> ctr
+end = section_end
+section_contents :: Section mon ctr a -> mon
+section_contents (Section _ _ x _ _) = x
+section_result :: Section mon ctr a -> mon
+section_result (Section _ _ _ x _) = x
+section_return :: Section mon ctr a -> a
+section_return (Section _ _ _ _ x) = x
+
+nosomething something name = error$ "Section generated with " ++ name ++ " has no " ++ something
+nocontents = nosomething "section_contents"
+noresult = nosomething "section_result"
+noreturn = nosomething "section_return"
+cantXsection x = error$ "Can't " ++ x ++ " Section.  Please extract its start first."
 
 newtype Assembler mon ctr a = Assembler (ctr -> (ctr, mon, a))
 assembler_function (Assembler f) = f
 
- -- This can be called like "assembly 0 ..." because there's a Num Assembly instance.
-assemble :: (Monoid mon, Num ctr) => Assembly mon a ctr -> Assembler mon ctr b -> Assembly mon b ctr
+ -- This can be called like "section 0 ..." because there's a Num Section instance.
+assemble :: (Monoid mon, Num ctr) => Section mon ctr a -> Assembler mon ctr b -> Section mon ctr b
 assemble prev (Assembler f) = let
-    (re, rp, rr) = f (assembly_end prev)
-    in Assembly (assembly_end prev) re rp (Just (assembly_result prev <> rp)) (Just rr)
+    (re, rp, rr) = f (section_end prev)
+    in Section (section_end prev) re rp (section_result prev <> rp) rr
 
-section :: (Monoid mon, Num ctr) => Assembler mon ctr a -> Assembler mon ctr (Assembly mon a ctr)
+allocate :: (Num ctr, Integral siz) => Section mon ctr a -> [siz] -> [Section mon ctr b]
+allocate prev [] = []
+allocate prev (z:zs) = let
+    s = Section (end prev) (end prev + fromIntegral z) (nocontents "allocate") (noresult "allocate") (noreturn "allocate")
+    in s : allocate s zs
+
+section :: (Monoid mon, Num ctr) => Assembler mon ctr a -> Assembler mon ctr (Section mon ctr a)
 section (Assembler inner) = Assembler outer where
     outer pos = let
         (ie, ip, ir) = inner pos
-        in (ie, ip, Assembly pos ie ip Nothing (Just ir))
+        in (ie, ip, Section pos ie ip (noresult "section") ir)
 
 nothing :: (Monoid mon, Num ctr) => Assembler mon ctr ()
 nothing = Assembler f where f pos = (pos, mempty, ())
@@ -99,6 +120,13 @@ enforce_counter expected = Assembler f where
             else error$ printf "Something was misaligned (0x%x /= 0x%x)" (toInteger got) (toInteger expected)
         in (expected, payload, ())
 
+provide :: (Monoid mon, Integral ctr) => Section mon ctr a -> Assembler mon ctr b -> Assembler mon ctr b
+provide allocation code = do
+    enforce_counter (start allocation)
+    ret <- code
+    enforce_counter (end allocation)
+    return ret
+
 trace_counter :: (Monoid mon, Integral ctr, Show a) => a -> Assembler mon ctr ()
 trace_counter label = do
     spot <- here
@@ -113,43 +141,44 @@ instance (Monoid mon, Integral ctr) => Monad (Assembler mon ctr) where
 instance (Monoid mon, Integral ctr) => MonadFix (Assembler mon ctr) where
     mfix = fix_assembler
 
-class HasArea a where
-    start :: Num i => a i -> i
-    end :: Num i => a i -> i
-    size :: Num i => a i -> i
+instance (Monoid mon, Num ctr) => Num (Section mon ctr a) where
+    a + b = Section (start a + start b) (start a + start b) mempty mempty (noreturn "(+)")
+    a - b = Section (start a - start b) (start a + start b) mempty mempty (noreturn "(-)")
+    (*) = cantXsection "(*)"
+    abs = cantXsection "abs"
+    signum = cantXsection "signum"
+    fromInteger x = Section (fromInteger x) (fromInteger x) mempty mempty (noreturn "fromInteger")
 
-instance HasArea (Assembly mon a) where
-    start = assembly_start
-    end = assembly_end
-    size = assembly_size
+instance (Monoid mon, Num ctr, Enum ctr) => Enum (Section mon ctr a) where
+    succ a = Section (succ (start a)) (succ (start a)) mempty mempty (noreturn "succ")
+    pred a = Section (pred (start a)) (pred (start a)) mempty mempty (noreturn "pred")
+    toEnum = error$ "Can't toEnum Section"
+    fromEnum = error$ "Can't fromEnum Section (you can toInteger it though)"
 
-instance (Monoid mon, Num ctr) => Num (Assembly mon a ctr) where
-    a + b = Assembly (start a + start b) (start a + start b) mempty (Just mempty) Nothing
-    a - b = Assembly (start a - start b) (start a + start b) mempty (Just mempty) Nothing
-    (*) = error$ "Can't (*) Assembly."
-    abs = error$ "Can't abs Assembly."
-    signum = error$ "Can't signum Assembly."
-    fromInteger x = Assembly (fromInteger x) (fromInteger x) mempty (Just mempty) Nothing
+instance Eq ctr => Eq (Section mon ctr a) where
+    a == b = section_start a == section_start b
 
-instance (Monoid mon, Num ctr, Enum ctr) => Enum (Assembly mon a ctr) where
-    succ a = Assembly (succ (start a)) (succ (start a)) mempty (Just mempty) Nothing
-    pred a = Assembly (pred (start a)) (succ (start a)) mempty (Just mempty) Nothing
-    toEnum = error$ "Can't toEnum Assembly."
-    fromEnum = error$ "Can't fromEnum Assembly (you can toInteger it though)."
+instance Ord ctr => Ord (Section mon ctr a) where
+    compare a b = compare (section_start a) (section_start b)
 
-instance Eq ctr => Eq (Assembly mon a ctr) where
-    a == b = assembly_start a == assembly_start b
+instance (Monoid mon, Real ctr) => Real (Section mon ctr a) where
+    toRational = toRational . section_start
 
-instance Ord ctr => Ord (Assembly mon a ctr) where
-    compare a b = compare (assembly_start a) (assembly_start b)
+instance (Monoid mon, Integral ctr) => Integral (Section mon ctr a) where
+    quot = cantXsection "quot"
+    rem = cantXsection "rem"
+    div = cantXsection "div"
+    mod = cantXsection "mod"
+    quotRem = cantXsection "quotRem"
+    divMod = cantXsection "divMod"
+    toInteger = toInteger . section_start
 
-instance (Monoid mon, Real ctr) => Real (Assembly mon a ctr) where
-    toRational = toRational . assembly_start
+instance (Monoid mon, Bounded ctr) => Bounded (Section mon ctr a) where
+    minBound = Section minBound minBound mempty mempty (noreturn "minBound")
+    maxBound = Section maxBound maxBound mempty mempty (noreturn "maxBound")
 
-instance (Monoid mon, Integral ctr) => Integral (Assembly mon a ctr) where
-    quotRem = error$ "Assembly is only Integral for its toInteger method.  You can't call quotRem and such on it.  Sory."
-    toInteger = toInteger . assembly_start
-
-instance (Monoid mon, Bounded ctr) => Bounded (Assembly mon a ctr) where
-    minBound = Assembly minBound minBound mempty (Just mempty) Nothing
-    maxBound = Assembly maxBound maxBound mempty (Just mempty) Nothing
+section_merge :: (Monoid mon, Integral ctr) => Section mon ctr a -> Section mon ctr b -> Section mon ctr b
+section_merge a b = if end a == start b
+    then Section (start a) (end b) (section_contents a <> section_contents b) (noresult "section_merge") (section_return b)
+    else error$ printf "Tried to merge nonadjacent sections (0x%x..0x%x and 0x%x..0x%x)"
+        (toInteger (start a)) (toInteger (end a)) (toInteger (start b)) (toInteger (end b))

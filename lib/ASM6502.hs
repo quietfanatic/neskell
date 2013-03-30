@@ -12,7 +12,8 @@ import ASM
 import Text.Printf
 
 type ASM6502 a = ASM Word16 a
-type Assembly6502 a = Assembly (S.Seq Word8) a Word16
+type Section6502 a = ASMSection Word16 a
+type ASM6502Section a = ASMSection Word16 a
 
 low :: Integral a => a -> Word8
 low = fromIntegral

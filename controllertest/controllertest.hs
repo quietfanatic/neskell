@@ -223,10 +223,10 @@ nmi = asm reset $ mdo
 data_begin = asm nmi nothing
 
 [sprite_palettes, background_palettes, ball_model, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
- tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = allocate16 (start data_begin)
+ tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = allocate16 data_begin
  [16, 16, 4 * 4, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
 
-all_palettes = sprite_palettes <> background_palettes
+all_palettes = section_merge sprite_palettes background_palettes
 
 data_section = asm data_begin $ mdo
 
