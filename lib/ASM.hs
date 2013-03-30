@@ -38,14 +38,14 @@ byte = unit_assembler . S.singleton
 
 bytes :: Num ctr => F.Foldable t => t Word8 -> ASM ctr ()
 bytes bs = Assembler f where
-    f pos = (F.foldl (const . (+ 1)) pos bs, S.fromList (F.toList bs), ())
+    f (ann, pos) = (ann, F.foldl (const . (+ 1)) pos bs, S.fromList (F.toList bs), ())
 
 ascii :: Num ctr => [Char] -> ASM ctr ()
 ascii = bytes . map (fromIntegral . ord)
 
 bytestring :: Num ctr => B.ByteString -> ASM ctr ()
 bytestring bs = Assembler f where
-    f pos = (pos + fromIntegral (B.length bs), S.fromList (B.unpack bs), ())
+    f (ann, pos) = (ann, pos + fromIntegral (B.length bs), S.fromList (B.unpack bs), ())
 
 {-# NOINLINE binfile #-}
 binfile :: String -> B.ByteString
@@ -53,16 +53,16 @@ binfile = unsafePerformIO . B.readFile
 
 fill :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fill size b = if size >= 0
-    then Assembler (\pos -> (pos + size, S.replicate (fromIntegral size) b, ()))
+    then Assembler (\(ann, pos) -> (ann, pos + size, S.replicate (fromIntegral size) b, ()))
     else error$ "Tried to fill a block with negative size (did something assemble too large?)"
 
 fillto :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fillto target b = Assembler f where
-    f pos = let
+    f (ann, pos) = let
         payload = if target - pos < 0  -- allow target to be 0 on unsigned types for instance
             then error$ "fillto was called too late (did something assemble too large?)"
             else S.replicate (fromIntegral (target - pos)) b
-        in (target, payload, ())
+        in (ann, target, payload, ())
 
 pad :: Integral ctr => ctr -> Word8 -> ASM ctr a -> ASM ctr a
 pad size = pad_assembler size . S.singleton
@@ -80,32 +80,32 @@ le16 :: (Integral a, Integral ctr) => a -> ASM ctr ()
 le16 x = Assembler f where
     w = fromIntegral x :: Word16
     res = S.fromList (map (fromIntegral . shiftR w . (8 *)) [0..1])
-    f pos = (pos+2, res, ())
+    f (ann, pos) = (ann, pos+2, res, ())
 be16 :: (Integral a, Integral ctr) => a -> ASM ctr ()
 be16 x = Assembler f where
     w = fromIntegral x :: Word16
     res = S.fromList (map (fromIntegral . shiftR w . (8 *)) (reverse [0..1]))
-    f pos = (pos+2, res, ())
+    f (ann, pos) = (ann, pos+2, res, ())
 le32 :: (Integral a, Integral ctr) => a -> ASM ctr ()
 le32 x = Assembler f where
     w = fromIntegral x :: Word32
     res = S.fromList (map (fromIntegral . shiftR w . (8 *)) [0..3])
-    f pos = (pos+4, res, ())
+    f (ann, pos) = (ann, pos+4, res, ())
 be32 :: (Integral a, Integral ctr) => a -> ASM ctr ()
 be32 x = Assembler f where
     w = fromIntegral x :: Word32
     res = S.fromList (map (fromIntegral . shiftR w . (8 *)) (reverse [0..3]))
-    f pos = (pos+4, res, ())
+    f (ann, pos) = (ann, pos+4, res, ())
 le64 :: (Integral a, Integral ctr) => a -> ASM ctr ()
 le64 x = Assembler f where
     w = fromIntegral x :: Word64
     res = S.fromList (map (fromIntegral . shiftR w . (8 *)) [0..7])
-    f pos = (pos+8, res, ())
+    f (ann, pos) = (ann, pos+8, res, ())
 be64 :: (Integral a, Integral ctr) => a -> ASM ctr ()
 be64 x = Assembler f where
     w = fromIntegral x :: Word64
     res = S.fromList (map (fromIntegral . shiftR w . (8 *)) (reverse [0..7]))
-    f pos = (pos+8, res, ())
+    f (ann, pos) = (ann, pos+8, res, ())
 lefloat :: Integral ctr => Float -> ASM ctr ()
 lefloat = le32 . (unsafeCoerce :: Float -> Word32)
 befloat :: Integral ctr => Float -> ASM ctr ()
