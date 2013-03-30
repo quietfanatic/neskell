@@ -6,7 +6,7 @@ module ASM (
     byte, bytes, ascii, bytestring, binfile, fill, fillto, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here,
-    asm, asm_result, no_overflow,
+    asm, asm_result, no_overflow, enforce_no_overflow,
     startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
     Allocation(..), provide, provide_at,
@@ -20,6 +20,7 @@ import Data.Monoid
 import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import qualified Data.ByteString as B
+import Text.Printf
 import Assembly
 import Unsafe.Coerce  -- for serializing floats and doubles
 import System.IO.Unsafe  -- for binfile
@@ -75,65 +76,62 @@ hex _ = error "Odd number of hex digits in hexdata string."
 hexdata :: Num ctr => String -> ASM ctr ()
 hexdata = bytes . hex
 
-le16 :: Integral ctr => Word16 -> ASM ctr ()
-le16 w = do
-    byte$ fromIntegral w
-    byte$ fromIntegral (shiftR w 8)
-be16 :: Integral ctr => Word16 -> ASM ctr ()
-be16 w = do
-    byte$ fromIntegral (shiftR w 8)
-    byte$ fromIntegral w
-le32 :: Integral ctr => Word32 -> ASM ctr ()
-le32 w = do
-    byte$ fromIntegral w
-    byte$ fromIntegral (shiftR w 8)
-    byte$ fromIntegral (shiftR w 16)
-    byte$ fromIntegral (shiftR w 24)
-be32 :: Integral ctr => Word32 -> ASM ctr ()
-be32 w = do
-    byte$ fromIntegral (shiftR w 24)
-    byte$ fromIntegral (shiftR w 16)
-    byte$ fromIntegral (shiftR w 8)
-    byte$ fromIntegral w
-le64 :: Integral ctr => Word64 -> ASM ctr ()
-le64 w = do
-    byte$ fromIntegral w
-    byte$ fromIntegral (shiftR w 8)
-    byte$ fromIntegral (shiftR w 16)
-    byte$ fromIntegral (shiftR w 24)
-    byte$ fromIntegral (shiftR w 32)
-    byte$ fromIntegral (shiftR w 40)
-    byte$ fromIntegral (shiftR w 48)
-    byte$ fromIntegral (shiftR w 56)
-be64 :: Integral ctr => Word64 -> ASM ctr ()
-be64 w = do
-    byte$ fromIntegral (shiftR w 56)
-    byte$ fromIntegral (shiftR w 48)
-    byte$ fromIntegral (shiftR w 40)
-    byte$ fromIntegral (shiftR w 32)
-    byte$ fromIntegral (shiftR w 24)
-    byte$ fromIntegral (shiftR w 16)
-    byte$ fromIntegral (shiftR w 8)
-    byte$ fromIntegral w
+le16 :: (Integral a, Integral ctr) => a -> ASM ctr ()
+le16 x = Assembler f where
+    w = fromIntegral x :: Word16
+    res = S.fromList (map (fromIntegral . shiftR w . (8 *)) [0..1])
+    f pos = (pos+2, res, ())
+be16 :: (Integral a, Integral ctr) => a -> ASM ctr ()
+be16 x = Assembler f where
+    w = fromIntegral x :: Word16
+    res = S.fromList (map (fromIntegral . shiftR w . (8 *)) (reverse [0..1]))
+    f pos = (pos+2, res, ())
+le32 :: (Integral a, Integral ctr) => a -> ASM ctr ()
+le32 x = Assembler f where
+    w = fromIntegral x :: Word32
+    res = S.fromList (map (fromIntegral . shiftR w . (8 *)) [0..3])
+    f pos = (pos+4, res, ())
+be32 :: (Integral a, Integral ctr) => a -> ASM ctr ()
+be32 x = Assembler f where
+    w = fromIntegral x :: Word32
+    res = S.fromList (map (fromIntegral . shiftR w . (8 *)) (reverse [0..3]))
+    f pos = (pos+4, res, ())
+le64 :: (Integral a, Integral ctr) => a -> ASM ctr ()
+le64 x = Assembler f where
+    w = fromIntegral x :: Word64
+    res = S.fromList (map (fromIntegral . shiftR w . (8 *)) [0..7])
+    f pos = (pos+8, res, ())
+be64 :: (Integral a, Integral ctr) => a -> ASM ctr ()
+be64 x = Assembler f where
+    w = fromIntegral x :: Word64
+    res = S.fromList (map (fromIntegral . shiftR w . (8 *)) (reverse [0..7]))
+    f pos = (pos+8, res, ())
 lefloat :: Integral ctr => Float -> ASM ctr ()
-lefloat = le32 . unsafeCoerce
+lefloat = le32 . (unsafeCoerce :: Float -> Word32)
 befloat :: Integral ctr => Float -> ASM ctr ()
-befloat = be32 . unsafeCoerce
+befloat = be32 . (unsafeCoerce :: Float -> Word32)
 ledouble :: Integral ctr => Double -> ASM ctr ()
-ledouble = le32 . unsafeCoerce
+ledouble = le32 . (unsafeCoerce :: Double -> Word64)
 bedouble :: Integral ctr => Double -> ASM ctr ()
-bedouble = be32 . unsafeCoerce
-
+bedouble = be32 . (unsafeCoerce :: Double -> Word64)
 
 no_overflow' :: (Integral a, Integral b) => b -> b -> a -> Maybe b
-no_overflow' min max x = let
-    in if toInteger min <= toInteger x && toInteger x <= toInteger max
-        then Just (fromIntegral x)
-        else Nothing
+no_overflow' min max x = if toInteger min <= toInteger x && toInteger x <= toInteger max
+    then Just (fromIntegral x)
+    else Nothing
 
 no_overflow :: (Integral a, Integral b, Bounded b) => a -> Maybe b
 no_overflow = no_overflow' minBound maxBound
 
+enforce_no_overflow' :: (Integral a, Integral b, Integral ctr) => b -> b -> String -> ctr -> a -> b
+enforce_no_overflow' min max name pos x = if toInteger min <= toInteger x
+    then if toInteger x <= toInteger max
+        then fromIntegral x
+        else error$ printf "Overflow in argument to %s (0x%x > 0x%x) at 0x%x" name (toInteger x) (toInteger max) (toInteger pos)
+    else error$ printf "Overflow in argument to %s (0x%x < 0x%x) at 0x%x" name (toInteger x) (toInteger min) (toInteger pos)
+
+enforce_no_overflow :: (Integral a, Integral b, Bounded b, Integral ctr) => String -> ctr -> a -> b
+enforce_no_overflow = enforce_no_overflow' minBound maxBound
 
 startof x = do
     start <- here

@@ -83,9 +83,9 @@ run engine note_table = mdo
                     next
                     stax timer
                     jmp (end read_commands)
-                lday (start command_table)  -- Do a special comand
+                lday command_table  -- Do a special comand
                 sta command_ptr
-                lday (start command_table + 1)
+                lday (command_table + 1)
                 sta (command_ptr + 1)
                 ldy tmpy
                 jmpp command_ptr
@@ -100,10 +100,10 @@ run engine note_table = mdo
     jmp (end command_table)
     command_table <- section$ mdo
         le16 command_loopa
-        le16 (start command_loopb)
-        le16 (start command_delay)
-        le16 (start command_set_env)
-        le16 (start command_call)
+        le16 command_loopb
+        le16 command_delay
+        le16 command_set_env
+        le16 command_call
         command_loopb <- section$ mdo
             stx tmpy
             inx

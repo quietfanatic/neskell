@@ -54,9 +54,9 @@ op8or16' max name a b x = case toInteger max of
     127 -> byte a >> byte (fromIntegral x)
     65535 -> byte b >> le16 (fromIntegral x)
     32767 -> byte b >> le16 (fromIntegral x)
-    _ -> case no_overflow x of
+    _ -> case no_overflow x :: Maybe Word8 of
         Just w8 -> byte a >> byte w8
-        Nothing -> case no_overflow x of
+        Nothing -> case no_overflow x :: Maybe Word16 of
             Just w16 -> byte b >> le16 w16
             Nothing -> Assembler f where
                 f pos = error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger pos) (toInteger x)

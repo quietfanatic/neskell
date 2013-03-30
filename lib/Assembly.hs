@@ -124,16 +124,16 @@ instance HasArea (Assembly mon a) where
     size = assembly_size
 
 instance (Monoid mon, Num ctr) => Num (Assembly mon a ctr) where
-    (+) = error$ "Can't (+) Assembly."
-    (-) = error$ "Can't (-) Assembly."
+    a + b = Assembly (start a + start b) (start a + start b) mempty (Just mempty) Nothing
+    a - b = Assembly (start a - start b) (start a + start b) mempty (Just mempty) Nothing
     (*) = error$ "Can't (*) Assembly."
     abs = error$ "Can't abs Assembly."
     signum = error$ "Can't signum Assembly."
     fromInteger x = Assembly (fromInteger x) (fromInteger x) mempty (Just mempty) Nothing
 
-instance Enum ctr => Enum (Assembly mon a ctr) where
-    succ = error$ "Can't succ Assembly."
-    pred = error$ "Can't pred Assembly."
+instance (Monoid mon, Num ctr, Enum ctr) => Enum (Assembly mon a ctr) where
+    succ a = Assembly (succ (start a)) (succ (start a)) mempty (Just mempty) Nothing
+    pred a = Assembly (pred (start a)) (succ (start a)) mempty (Just mempty) Nothing
     toEnum = error$ "Can't toEnum Assembly."
     fromEnum = error$ "Can't fromEnum Assembly (you can toInteger it though)."
 
