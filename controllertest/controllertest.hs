@@ -47,17 +47,6 @@ btn_right : btn_left : btn_down : btn_up :
 xcoord = 0x00
 ycoord = 0x01
 
-data_begin = assembly_return prgbank
-prgbank = asm 0xc000 $ mdo
-    reset <- startof reset_section
-    nmi <- startof nmi_section
-    data_begin <- startof data_section
-    fillto 0xfffa 0xff
-    provide NES.nmi $ le16 nmi
-    provide NES.reset $ le16 reset
-    provide NES.irq $ le16 0
-    return data_begin
-
 init_ball = mdo
     ldai 0x80
     sta ball_x
@@ -126,7 +115,6 @@ draw_model_sub = do
         dey
     rts
 
- -- Main code stuff
 
 read_controllers = mdo
      -- Freeze controllers for polling
@@ -140,7 +128,10 @@ read_controllers = mdo
     read NES.controller1 input1
     read NES.controller2 input2
 
-reset_section = mdo
+ -- Main code stuff
+prgbank_start = asm 0xc000 nothing
+
+reset = asm prgbank_start $ mdo
     NES.initialize
      -- Load all the palettes
     NES.set_ppuaddr 0x3f00
@@ -186,7 +177,7 @@ reset_section = mdo
     idle <- here
     jmp idle
 
-nmi_section = mdo
+nmi = asm reset $ mdo
     read_controllers
      -- Start sprite memory transfer
     0x00 ->* NES.oamaddr
@@ -229,13 +220,15 @@ nmi_section = mdo
     draw_model <- startof draw_model_sub
     nothing
 
+data_begin = asm nmi nothing
+
 [sprite_palettes, background_palettes, ball_model, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
- tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = allocate16 data_begin
+ tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = allocate16 (start data_begin)
  [16, 16, 4 * 4, 8, 8, 8, 8, 7, 7, 7, 7, 0xf0]
 
 all_palettes = sprite_palettes <> background_palettes
 
-data_section = mdo
+data_section = asm data_begin $ mdo
 
     provide sprite_palettes $ hexdata$ ""
         ++ "22 12 02 0f"
@@ -286,4 +279,12 @@ data_section = mdo
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
         ++ "06 06 06 06 06 06 06 06 06 06 06 06 06 06 06 06"
 
+data_end = asm data_section nothing
 
+prgbank_end = asm data_end $ mdo
+    fillto 0xfffa 0xff
+    provide NES.nmi $ le16 $ start nmi
+    provide NES.reset $ le16 $ start reset
+    provide NES.irq $ le16 0
+
+prgbank = asm prgbank_end nothing
