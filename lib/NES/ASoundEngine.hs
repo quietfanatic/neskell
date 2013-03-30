@@ -22,6 +22,7 @@ validate (Allocation _ s) cont = if s == datasize
     then cont
     else error$ "Sound engine was given an allocation of the wrong size (" ++ show s ++ " /= " ++ show datasize ++ ")"
 
+init :: Allocation Word16 -> ASM6502 ()
 init engine = validate engine $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
@@ -37,6 +38,7 @@ set_stream engine chn stream = validate engine $ do
     ldai (high stream)
     sta (position engine + chn + 1)
 
+run :: HasArea nt => Allocation Word16 -> nt Word16 -> ASM6502 ()
 run engine note_table = mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.
@@ -64,7 +66,7 @@ run engine note_table = mdo
                 sty tmpy
                 asla
                 tay
-                lday note_table
+                lday (start note_table)
                 stax NES.chn_low
                 lday (start note_table + 1)
                 orai 0xf8
@@ -112,9 +114,13 @@ run engine note_table = mdo
 
 loop_code : set_env_code : _ = [0x80..] :: [Word8]
 
+loop :: Word8 -> ASM6502 () -> ASM6502 ()
 loop times code = do
     s <- sizeof code
     byte loop_code
     byte times
-    byte (s + 3)
+    case no_overflow (s + 3) of
+        Just w8 -> byte w8
+        Nothing -> fail$ "Loop is too large.  This restriction should be lifted soon."
+set_env :: Word8 -> ASM6502 ()
 set_env val = byte set_env_code >> byte val

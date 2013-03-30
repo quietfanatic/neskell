@@ -13,23 +13,14 @@ import qualified NES.ASoundEngine as S
 
 main = do
     B.putStr $ NES.header 0x01 0x00 0x00 0x00
+    trace ("ASDF") (return ())
     B.putStr $ asm_result prgbank
-
 
 [sound] = allocate 0x300 [S.datasize]
 
-data_begin = assembly_return prgbank
-prgbank = asm 0xc000 $ mdo
-    reset <- startof reset_section
-    nmi <- startof nmi_section
-    data_begin <- startof data_section
-    fillto 65530 0xff
-    provide NES.nmi $ le16 nmi
-    provide NES.reset $ le16 reset
-    provide NES.irq $ le16 0
-    return data_begin
+prgbank_start = asm 0xc000 nothing
 
-reset_section = mdo
+reset = asm prgbank_start $ mdo
     NES.initialize
 
      -- Set background color
@@ -44,25 +35,25 @@ reset_section = mdo
     NES.apuctrl *<- NES.enable_pulse1 .|. NES.enable_pulse2
     NES.apumode *<- NES.sequencer_mode_bit .|. NES.disable_frame_irq_bit
 
+
     S.init sound
-    S.set_stream sound NES.pulse1 pulse1_stream
-    S.set_stream sound NES.pulse2 pulse2_stream
+    S.set_stream sound NES.pulse1 pulse1_stream1
+    S.set_stream sound NES.pulse2 pulse2_stream1
 
     idle <- here
     jmp idle
 
-nmi_section = mdo
+nmi = asm reset $ mdo
 
     S.run sound note_table
 
     rti
 
-[note_table, pulse1_stream, pulse2_stream, triangle_stream]
-    = allocate16 data_begin [2 * 0x5f, size pulse1_stream1, size pulse2_stream1, size triangle_stream2]
+data_begin = asm nmi nothing
 
  -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
  -- but a couple tweaks may have been made to sharpen notes up a little
-note_table' = [                                                     0x0000, 0x07f1, 0x0780, 0x0713, -- a1-b1 (0x01-0x03)
+note_table = asm data_begin $ mapM_ le16 ([                         0x0000, 0x07f1, 0x0780, 0x0713, -- a1-b1 (0x01-0x03)
     0x06ad, 0x064d, 0x05f3, 0x059d, 0x054d, 0x0500, 0x04b8, 0x0475, 0x0435, 0x03f8, 0x03bf, 0x0389, -- c2-b2 (0x04-0x0f)
     0x0356, 0x0326, 0x02f9, 0x02ce, 0x02a6, 0x027f, 0x025c, 0x023a, 0x021a, 0x01fb, 0x01df, 0x01c4, -- c3-b3 (0x10-0x1b)
     0x01ab, 0x0193, 0x017c, 0x0167, 0x0151, 0x013f, 0x012d, 0x011c, 0x010c, 0x00fd, 0x00ef, 0x00e1, -- c4-b4 (0x1c-0x27)
@@ -70,35 +61,35 @@ note_table' = [                                                     0x0000, 0x07
     0x006a, 0x0064, 0x005e, 0x0059, 0x0054, 0x004f, 0x004b, 0x0046, 0x0042, 0x003f, 0x003b, 0x0038, -- c6-b6 (0x34-0x3f)
     0x0034, 0x0031, 0x002f, 0x002c, 0x0029, 0x0027, 0x0025, 0x0023, 0x0021, 0x001f, 0x001d, 0x001b, -- c7-b7 (0x40-0x4b)
     0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4c-0x57)
-    0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16]                             -- c9-f#9 (0x58-0x5e)
+    0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16])                            -- c9-f#9 (0x58-0x5e)
 
-pulse1_stream1 = asm 0 $ do
+pulse1_stream1 = asm note_table $ do
     S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x8)
     S.loop 0 $ do
         hexdata "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
         hexdata "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
 
-pulse2_stream1 = asm 0 $ do
+pulse2_stream1 = asm pulse1_stream1 $ do
     S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x6)
     S.loop 0 $ do
         hexdata "1480 1280 1040 1240 1480"
         hexdata "1080 1280 1480 1280"
 
-pulse1_stream2 = asm 0 $ do
+pulse1_stream2 = asm pulse2_stream1 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     S.loop 0 $ do
         S.loop 2 $ do
             hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004"
         S.loop 4 $ do
             hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
-pulse2_stream2 = asm 0 $ do
+pulse2_stream2 = asm pulse1_stream2 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     S.loop 0 $ do
         S.loop 2 $ do
             hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
         S.loop 4 $ do
             hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
-triangle_stream2 = asm 0 $ do
+triangle_stream2 = asm pulse2_stream2 $ do
     S.set_env 0x81
     S.loop 0 $ do
         hexdata "00c0 00c0"
@@ -106,9 +97,11 @@ triangle_stream2 = asm 0 $ do
         hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
         hexdata "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
 
+data_end = asm triangle_stream2 nothing
 
-data_section = mdo
-    provide note_table $ sequence $ map le16 $ note_table'
-    provide pulse1_stream $ bytestring $ asm_result pulse1_stream1
-    provide pulse2_stream $ bytestring $ asm_result pulse2_stream1
+prgbank = asm data_end $ mdo
+    fillto 0xfffa 0xff
+    provide NES.nmi $ le16 $ start nmi
+    provide NES.reset $ le16 $ start reset
+    provide NES.irq $ le16 0
 

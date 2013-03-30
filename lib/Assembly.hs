@@ -4,7 +4,7 @@ module Assembly (
     Assembler(..), assembler_function, assemble,
     nothing, here, unit_assembler,
     pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
-    enforce_counter,
+    enforce_counter, trace_counter,
     HasArea(..)
 ) where
 
@@ -14,6 +14,7 @@ import Data.Monoid
 import qualified Data.Foldable as F
 import Control.Monad.Fix
 import Text.Printf
+import Debug.Trace
 
  -- Yes, a and ctr are reversed in these two types.
  -- The reason is Assembly needs to be HasArea and Assembler needs to be Monad
@@ -89,6 +90,11 @@ enforce_counter expected = Assembler f where
             then mempty
             else error$ printf "Something was misaligned (0x%x /= 0x%x)" (toInteger got) (toInteger expected)
         in (expected, payload, ())
+
+trace_counter :: (Monoid mon, Integral ctr, Show a) => a -> Assembler mon ctr ()
+trace_counter label = do
+    spot <- here
+    trace (show label ++ ": " ++ show (toInteger spot)) nothing
 
 instance (Monoid mon, Integral ctr) => Monad (Assembler mon ctr) where
     return = return_assembler
