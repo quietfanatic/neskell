@@ -13,7 +13,6 @@ import qualified NES.ASoundEngine as S
 
 main = do
     B.putStr $ NES.header 0x01 0x00 0x00 0x00
-    trace ("ASDF") (return ())
     B.putStr $ asm_result prgbank
 
 [bg_color] = allocate8 0x10 [1]
