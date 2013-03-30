@@ -7,7 +7,7 @@ module ASM (
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here, set_counter,
     assemble_asm, asm, no_overflow,
-    startof, endof, sizeof,
+    startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
     Allocation(..), start, size, end, provide, provide_at,
     allocate, allocate8, allocate16, allocate32, allocate64
@@ -141,6 +141,12 @@ startof x = do
     return start
 
 endof x = x >> here
+
+startend x = do
+    start <- here
+    x
+    end <- here
+    return (start, end)
 
 sizeof x = do
     start <- here

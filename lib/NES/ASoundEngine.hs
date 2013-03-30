@@ -24,9 +24,8 @@ validate (Allocation _ s) cont = if s == datasize
 init engine = validate engine $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
+         -- We're assuming memory has been zeroed out.
         0x01 ->* timer engine + chn
-        0x00 ->* repeat_counter engine + chn
-        0x00 ->* NES.chn_env + chn
     init_part NES.pulse1
     init_part NES.pulse2
     init_part NES.triangle
@@ -43,18 +42,20 @@ run engine note_table = mdo
     let eposition = position engine
         etimer = timer engine
         reps = repeat_counter engine
-        pos = 0x00  -- 0x00 stays 0 (the "real" pointer is y:0x01)
+        pos = 0x00  -- 0x00 stays 0 (the real pointer is y:0x01)
         tmpy = 0x02
         next = do
             iny
             skip bne (inc (pos + 1))
     ldxi 0x00
     run_one <- startof$ mdo
+        ldax (eposition + 1)
+        skip bne (jmp just_wait)
         decx etimer
         skip beq (jmp just_wait)
         just_wait <- endof$ mdo
             ldyx eposition
-            ldax (eposition + 1) >> sta (pos + 1)
+            sta (pos + 1)
             read_note <- here
             ldayp pos
             bmi special
@@ -84,12 +85,11 @@ run engine note_table = mdo
                         stax reps
                     next
                     decx reps >> beq skip_goto
-                    do_goto <- startof$ mdo
+                    (do_goto, skip_goto) <- startend$ mdo
                         tya  -- reps is non-zero or loop is infitie
                         sec
                         sbcyp pos >> skip bcs (dec (pos + 1))
                         tay
-                    skip_goto <- here
                     next
                     jmp read_note
                     infiloop <- startof$ mdo
