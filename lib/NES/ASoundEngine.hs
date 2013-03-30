@@ -13,10 +13,9 @@ datasize = 0x20
 
  -- Data is laid out in fours to match the NES channels
  -- 11112222ttttnnnn11--22--tt--nn--
-program (Allocation x _) = x + 0x00
-position (Allocation x _) = x + 0x02
-timer (Allocation x _) = x + 0x10
-repeat_counter (Allocation x _) = x + 0x12
+position (Allocation x _) = x + 0x00
+timer (Allocation x _) = x + 0x02
+repeat_counter (Allocation x _) = x + 0x10
 
 validate (Allocation _ s) cont = if s == datasize
     then cont
@@ -25,7 +24,6 @@ validate (Allocation _ s) cont = if s == datasize
 init engine = validate engine $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
-        0x00 ->* program engine + chn
         0x01 ->* timer engine + chn
         0x00 ->* repeat_counter engine + chn
         0x00 ->* NES.chn_env + chn
@@ -35,17 +33,14 @@ init engine = validate engine $ mdo
 
 set_program engine chn prog = validate engine $ do
     ldai (low prog)
-    sta (program engine + chn)
     sta (position engine + chn)
     ldai (high prog)
-    sta (program engine + chn + 1)
     sta (position engine + chn + 1)
 
 run engine note_table = mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.
-    let eprogram = program engine
-        eposition = position engine
+    let eposition = position engine
         etimer = timer engine
         reps = repeat_counter engine
         pos = 0x00  -- 0x00 stays 0 (the "real" pointer is y:0x01)
@@ -80,7 +75,6 @@ run engine note_table = mdo
             special <- startof$ mdo
                 next
                 cmpi loop_code >> beq do_loop
-                cmpi repeat_code >> beq do_repeat
                 cmpi set_env_code >> beq do_set_env
                 do_loop <- startof$ mdo
                     ldax reps
@@ -102,10 +96,6 @@ run engine note_table = mdo
                         next
                         jmp do_goto
                     nothing
-                do_repeat <- startof$ mdo
-                    ldyx eprogram
-                    ldax (eprogram + 1) >> sta (pos + 1)
-                    jmp read_note
                 do_set_env <- startof$ mdo
                     ldayp pos >> stax NES.chn_env
                     next
@@ -119,8 +109,7 @@ run engine note_table = mdo
     inx >> inx >> inx >> inx
     skip (cpxi 0x0c >>. beq) (jmp run_one)
 
-loop_code : repeat_code : set_env_code : _ = [0x80..] :: [Word8]
+loop_code : set_env_code : _ = [0x80..] :: [Word8]
 
 loop times offset = [loop_code, times, offset]
-repeat = [repeat_code]
 set_env val = [set_env_code, val]
