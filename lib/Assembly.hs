@@ -105,7 +105,6 @@ instance (Monoid mon, Integral ctr) => Monad (Assembler mon ctr) where
 instance (Monoid mon, Integral ctr) => MonadFix (Assembler mon ctr) where
     mfix = fix_assembler
 
-
 class HasArea a where
     start :: Num i => a i -> i
     end :: Num i => a i -> i
