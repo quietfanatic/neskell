@@ -17,7 +17,7 @@ datasize = 0x20
  -- 11112222ttttnnnn11--22--tt--nn--
 engine_position (Allocation x _) = x + 0x00
 engine_timer (Allocation x _) = x + 0x02
-engine_reps (Allocation x _) = x + 0x10
+engine_reps (Allocation x _) = x + 0x10  -- Takes up two slots
 
 validate (Allocation _ s) cont = if s == datasize
     then cont
@@ -99,10 +99,18 @@ run engine note_table = mdo
     skip (cpxi 0x0c >>. beq) (jmp run_one)
     jmp done
     (command_table, done) <- startend$ mdo
-        le16 command_loop
+        le16 command_loopa
+        le16 command_loopb
         le16 command_delay
         le16 command_set_env
-        command_loop <- startof$ mdo
+        command_loopb <- startof$ mdo
+            stx tmpy
+            inx
+            jmp command_loop_start
+        command_loopa <- here
+        command_loop_start <- mdo
+            stx tmpy
+            command_loop_start <- here
             ldax reps
             skip bne$ mdo
                 ldayp pos  -- reps is zero; start loop
@@ -115,8 +123,10 @@ run engine note_table = mdo
             skip bne $ mdo
                 next
                 next
+                ldx tmpy
                 jmp read_command
             do_goto <- startof$ mdo
+                ldx tmpy
                 ldayp pos  -- reps is non-zero or loop is infinite
                 sta tmpy
                 next
@@ -124,7 +134,7 @@ run engine note_table = mdo
                 sta (pos + 1)
                 ldy tmpy
                 jmp read_command
-            nothing
+            return command_loop_start
         command_delay <- startof$ mdo
             ldayp pos >> stax timer
             next
@@ -136,7 +146,7 @@ run engine note_table = mdo
         nothing
     nothing
 
-loop_code : delay_code : set_env_code : _ = [0x80..] :: [Word8]
+loopa_code : loopb_code : delay_code : set_env_code : _ = [0x80..] :: [Word8]
 
 delaybyte d = if d <= 0xff
     then byte (fromIntegral d)
@@ -151,12 +161,28 @@ note n d = do
 delay :: Word8 -> ASM6502 ()
 delay d = byte delay_code >> delaybyte d
 
-loop :: Word8 -> ASM6502 () -> ASM6502 ()
-loop times code = do
+loopa :: Word8 -> ASM6502 () -> ASM6502 ()
+loopa times code = do
     begin <- here
     code
-    byte loop_code
+    byte loopa_code
     byte times
+    le16 begin
+
+loopb :: Word8 -> ASM6502 () -> ASM6502 ()
+loopb times code = do
+    begin <- here
+    code
+    byte loopb_code
+    byte times
+    le16 begin
+
+repeat :: ASM6502 () -> ASM6502 ()
+repeat code = do
+    begin <- here
+    code
+    byte loopa_code
+    byte 0
     le16 begin
 
 set_env :: Word8 -> ASM6502 ()
