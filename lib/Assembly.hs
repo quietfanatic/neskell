@@ -1,85 +1,142 @@
 
-module Assembly (Assembly(..), assemble, nothing, here, unit, units, pad_assembly, return_assembly, fail_assembly, append_assembly, bind_assembly, set_counter, enforce_counter) where
+module Assembly (
+    Assembly(..), assembly_start, assembly_size, assembly_end, assembly_result, assembly_return,
+    Assembler(..), assembler_function, assemble,
+    nothing, here, unit_assembler,
+    pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
+    enforce_counter,
+    HasArea(..)
+) where
 
+import Data.Int
+import Data.Word
 import Data.Monoid
 import qualified Data.Foldable as F
 import Control.Monad.Fix
 import Text.Printf
 
-newtype Assembly mon ctr a = Assembly (ctr -> (mon, ctr, a))
+ -- Yes, a and ctr are reversed in these two types.
+ -- The reason is Assembly needs to be HasArea and Assembler needs to be Monad
+data Assembly mon a ctr = Assembly ctr ctr mon (Maybe a)
+assembly_start (Assembly x _ _ _) = x
+assembly_size (Assembly s e _ _) = e - s
+assembly_end (Assembly _ x _ _) = x
+assembly_result (Assembly _ _ x _) = x
+assembly_return (Assembly _ _ _ (Just x)) = x
+assembly_return (Assembly _ _ _ Nothing) = error$ "assembly_return called on an assembly that didn't have an associated return value (e.g. one that was converted from an Integer)"
 
-assemble :: Num ctr => Assembly mon ctr a -> mon
-assemble (Assembly f) = comp where (comp, _, _) = f 0
+newtype Assembler mon ctr a = Assembler (ctr -> (ctr, mon, a))
+assembler_function (Assembler f) = f
 
-nothing :: Monoid mon => Assembly mon ctr ()
-nothing = Assembly (\c -> (mempty, c, ()))
+ -- This can be called like "assembly 0 ..." because there's a Num Assembly instance.
+assemble :: (Monoid mon, Num ctr) => Assembly mon a ctr -> Assembler mon ctr b -> Assembly mon b ctr
+assemble prev (Assembler f) = let
+    (re, rp, rr) = f (assembly_end prev)
+    in Assembly (assembly_end prev) re (assembly_result prev <> rp) (Just rr)
 
-here :: Monoid mon => Assembly mon ctr ctr
-here = Assembly (\c -> (mempty, c, c))
+nothing :: (Monoid mon, Num ctr) => Assembler mon ctr ()
+nothing = Assembler f where f pos = (pos, mempty, ())
 
-unit :: Num ctr => mon -> Assembly mon ctr ()
-unit u = Assembly (\c -> (u, c + 1, ()))
+here :: Monoid mon => Assembler mon ctr ctr
+here = Assembler f where f pos = (pos, mempty, pos)
 
-units :: (Monoid mon, Num ctr, F.Foldable a) => a mon -> Assembly mon ctr ()
-units us = Assembly (\c -> (F.fold us, F.foldl (const . (+ 1)) c us, ()))
+unit_assembler :: Num ctr => mon -> Assembler mon ctr ()
+unit_assembler x = Assembler f where f pos = (pos + 1, x, ())
 
-pad_assembly :: (Monoid mon, Integral ctr) => ctr -> mon -> Assembly mon ctr a -> Assembly mon ctr a
-pad_assembly size filling (Assembly code) = Assembly f where
-    f start = let
-        (coderes, finish, ret) = code start
-        res = if finish > start + size
-            then error$ printf "Code given to pad_assembly was larger than the alloted size (0x%x - 0x%x > 0x%x)"
-                               (toInteger finish) (toInteger start) (toInteger size)
-            else coderes <> F.fold (replicate (fromIntegral (start + size - finish)) filling)
-        in (res, start + size, ret)
+return_assembler :: Monoid mon => a -> Assembler mon ctr a
+return_assembler x = Assembler f where f pos = (pos, mempty, x)
 
-return_assembly :: Monoid mon => a -> Assembly mon ctr a
-return_assembly x = Assembly (\c -> (mempty, c, x))
+fail_assembler :: Integral ctr => String -> Assembler mon ctr a
+fail_assembler mess = Assembler f where  -- Be as lazy as possible.
+    f pos = let
+        err = error$ printf "%s at 0x%x" mess (toInteger pos)
+        in (pos, err, err)
 
-fail_assembly :: Integral ctr => String -> Assembly mon ctr a
-fail_assembly mess = Assembly f where
-    f start = let
-        err = error$ printf "%s at 0x%x" mess (toInteger start)
-        in (err, start, err)  -- Don't be strict.
+append_assembler :: Monoid mon => Assembler mon ctr a -> Assembler mon ctr b -> Assembler mon ctr b
+append_assembler (Assembler left) (Assembler right) = Assembler f where
+    f pos = let
+        (le, lp, lr) = left pos
+        (re, rp, rr) = right (le)
+        in (re, lp <> rp, rr)
 
-append_assembly :: Monoid mon => Assembly mon ctr a -> Assembly mon ctr b -> Assembly mon ctr b
-append_assembly (Assembly left) (Assembly right) = Assembly f where
-    f start = let
-        (leftres, mid, _) = left start
-        (rightres, end, ret) = right mid
-        in (leftres <> rightres, end, ret)
+bind_assembler :: Monoid mon => Assembler mon ctr a -> (a -> Assembler mon ctr b) -> Assembler mon ctr b
+bind_assembler (Assembler left) rightf = Assembler f where
+    f pos = let
+        (le, lp, lr) = left pos
+        (re, rp, rr) = assembler_function (rightf lr) le
+        in (re, lp <> rp, rr)
 
-bind_assembly :: Monoid mon => Assembly mon ctr a -> (a -> Assembly mon ctr b) -> Assembly mon ctr b
-bind_assembly (Assembly left) rightf = Assembly f where
-    f start = let
-        (leftres, mid, inter) = left start
-        Assembly right = rightf inter
-        (rightres, end, ret) = right mid
-        in (leftres <> rightres, end, ret)
+fix_assembler :: (a -> Assembler mon ctr a) -> Assembler mon ctr a
+fix_assembler f = Assembler g where
+    g pos = let
+        (end, pay, ret) = assembler_function (f ret) pos
+        in (end, pay, ret)
 
-fix_assembly :: (a -> Assembly mon ctr a) -> Assembly mon ctr a
-fix_assembly f = Assembly g where
-    g start = let
-        Assembly fixed = f ret
-        (res, end, ret) = fixed start
-        in (res, end, ret)
+pad_assembler :: (Monoid mon, Integral ctr) => ctr -> mon -> Assembler mon ctr a -> Assembler mon ctr a
+pad_assembler size filling (Assembler inner) = Assembler f where
+    f pos = let
+        (ie, ip, ir) = inner pos
+        payload = if ie > pos + size
+            then error$ printf "Code given to pad_assembler was larger than the alloted size (0x%x - 0x%x > 0x%x)"
+                               (toInteger ie) (toInteger pos) (toInteger size)
+            else ip <> F.fold (replicate (fromIntegral (pos + size - ie)) filling)
+        in (pos + size, payload, ir)
 
-set_counter :: (Monoid mon) => ctr -> Assembly mon ctr ()
-set_counter new = Assembly (\_ -> (mempty, new, ()))
-
-enforce_counter :: (Monoid mon, Integral ctr) => ctr -> Assembly mon ctr ()
-enforce_counter expected = Assembly f where
+enforce_counter :: (Monoid mon, Integral ctr) => ctr -> Assembler mon ctr ()
+enforce_counter expected = Assembler f where
     f got = let
-        res = if got == expected
+        payload = if got == expected
             then mempty
             else error$ printf "Something was misaligned (0x%x /= 0x%x)" (toInteger got) (toInteger expected)
-        in (res, expected, ())
+        in (expected, payload, ())
 
-instance (Monoid mon, Integral ctr) => Monad (Assembly mon ctr) where
-    return = return_assembly
-    (>>=) = bind_assembly
-    (>>) = append_assembly
-    fail = fail_assembly
+instance (Monoid mon, Integral ctr) => Monad (Assembler mon ctr) where
+    return = return_assembler
+    (>>=) = bind_assembler
+    (>>) = append_assembler
+    fail = fail_assembler
 
-instance (Monoid mon, Integral ctr) => MonadFix (Assembly mon ctr) where
-    mfix = fix_assembly
+instance (Monoid mon, Integral ctr) => MonadFix (Assembler mon ctr) where
+    mfix = fix_assembler
+
+
+class HasArea a where
+    start :: Num i => a i -> i
+    end :: Num i => a i -> i
+    size :: Num i => a i -> i
+
+instance HasArea (Assembly mon a) where
+    start = assembly_start
+    end = assembly_end
+    size = assembly_size
+
+instance (Monoid mon, Num ctr) => Num (Assembly mon a ctr) where
+    (+) = error$ "Can't (+) Assembly."
+    (-) = error$ "Can't (-) Assembly."
+    (*) = error$ "Can't (*) Assembly."
+    abs = error$ "Can't abs Assembly."
+    signum = error$ "Can't signum Assembly."
+    fromInteger x = Assembly (fromInteger x) (fromInteger x) mempty Nothing
+
+instance Enum ctr => Enum (Assembly mon a ctr) where
+    succ = error$ "Can't succ Assembly."
+    pred = error$ "Can't pred Assembly."
+    toEnum = error$ "Can't toEnum Assembly."
+    fromEnum = error$ "Can't fromEnum Assembly (you can toInteger it though)."
+
+instance Eq ctr => Eq (Assembly mon a ctr) where
+    a == b = assembly_start a == assembly_start b
+
+instance Ord ctr => Ord (Assembly mon a ctr) where
+    compare a b = compare (assembly_start a) (assembly_start b)
+
+instance (Monoid mon, Real ctr) => Real (Assembly mon a ctr) where
+    toRational = toRational . assembly_start
+
+instance (Monoid mon, Integral ctr) => Integral (Assembly mon a ctr) where
+    quotRem = error$ "Assembly is only Integral for its toInteger method.  You can't call quotRem and such on it.  Sory."
+    toInteger = toInteger . assembly_start
+
+instance (Monoid mon, Bounded ctr) => Bounded (Assembly mon a ctr) where
+    minBound = Assembly minBound minBound mempty Nothing
+    maxBound = Assembly maxBound maxBound mempty Nothing

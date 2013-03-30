@@ -2,6 +2,7 @@
 {-# LANGUAGE RecursiveDo #-}
 
 import qualified Data.ByteString as B
+import Assembly
 import ASM
 import ASM6502
 import qualified NES
@@ -13,7 +14,7 @@ import Debug.Trace
 
 main = do
     B.putStr $ NES.header 0x01 0x01 0x00 0x00
-    B.putStr $ prgbank
+    B.putStr $ asm_result prgbank
     sprites <- B.readFile "controllertest/sprites.bin"
     B.putStr $ sprites
     B.putStr $ B.replicate (0x1000 - B.length sprites) 0xff
@@ -46,8 +47,8 @@ btn_right : btn_left : btn_down : btn_up :
 xcoord = 0x00
 ycoord = 0x01
 
-(prgbank, 0, data_begin) = asm 0 $ mdo
-    set_counter 0xc000
+data_begin = assembly_return prgbank
+prgbank = asm 0xc000 $ mdo
     reset <- startof reset_section
     nmi <- startof nmi_section
     data_begin <- startof data_section

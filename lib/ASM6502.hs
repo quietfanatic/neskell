@@ -19,23 +19,23 @@ high :: Integral a => a -> Word8
 high x = fromIntegral (B.shiftR (fromIntegral x :: Word16) 8)
 
 op8 :: (Integral x, Show x) => String -> Word8 -> x -> ASM6502 ()
-op8 name a x = byte a >> Assembly f where
-    f start = let
+op8 name a x = byte a >> Assembler f where
+    f pos = let
         res = case no_overflow x :: Maybe Word8 of
             Just w8 -> S.singleton w8
-            Nothing -> error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger start) (toInteger x)
-        in (res, start + 1, ())
+            Nothing -> error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger pos) (toInteger x)
+        in (pos + 1, res, ())
 
 op16 :: (Integral x, Show x) => String -> Word8 -> x -> ASM6502 ()
-op16 name a x = byte a >> Assembly f where
-    f start = let
+op16 name a x = byte a >> Assembler f where
+    f pos = let
         res16 = case no_overflow x :: Maybe Word8 of
             Just w8 -> fromIntegral w8
             Nothing -> case no_overflow x :: Maybe Word16 of
                 Just w16 -> w16
-                Nothing -> error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger start) (toInteger x)
+                Nothing -> error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger pos) (toInteger x)
         res = S.singleton (fromIntegral res16) S.>< S.singleton (fromIntegral (B.shiftR res16 8))
-        in (res, start + 2, ())
+        in (pos + 2, res, ())
 
  -- case (maxBound of argument type) of
  --    8bit -> generate op8
@@ -57,8 +57,8 @@ op8or16' max name a b x = case toInteger max of
         Just w8 -> byte a >> byte w8
         Nothing -> case no_overflow x of
             Just w16 -> byte b >> le16 w16
-            Nothing -> Assembly f where
-                f start = error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger start) (toInteger x)
+            Nothing -> Assembler f where
+                f pos = error$ printf "Overflow error in argument to %s at 0x%x (0x%x)" name (toInteger pos) (toInteger x)
 
  -- HACK HACK HACK
 instance Bounded Integer where
@@ -67,13 +67,13 @@ instance Bounded Integer where
 
 
 rel8 :: Integral a => String -> Word8 -> a -> ASM6502 ()
-rel8 name b x = byte b >> Assembly f where
-    f start = let
-        off = fromIntegral x - fromIntegral (start + 1)
+rel8 name b x = byte b >> Assembler f where
+    f pos = let
+        off = fromIntegral x - fromIntegral (pos + 1)
         res = case no_overflow off :: Maybe Int8 of
             Just i8 -> S.singleton (fromIntegral i8)
-            Nothing -> fail$ printf "Branch target is too far away in %s at 0x%x (0x%x)" name (toInteger start) (toInteger off)
-        in (res, start + 1, ())
+            Nothing -> fail$ printf "Branch target is too far away in %s at 0x%x (0x%x)" name (toInteger pos) (toInteger off)
+        in (pos + 1, res, ())
 
 adci :: (Integral a, Show a) => a -> ASM6502 ()
 adci = op8 "adci" 0x69

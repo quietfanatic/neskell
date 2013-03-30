@@ -5,11 +5,11 @@ module ASM (
     ASM,
     byte, bytes, ascii, bytestring, binfile, fill, fillto, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
-    nothing, here, set_counter,
-    assemble_asm, asm, no_overflow,
+    nothing, here,
+    asm, asm_result, no_overflow,
     startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
-    Allocation(..), start, size, end, provide, provide_at,
+    Allocation(..), provide, provide_at,
     allocate, allocate8, allocate16, allocate32, allocate64
 ) where
 
@@ -24,27 +24,27 @@ import Assembly
 import Unsafe.Coerce  -- for serializing floats and doubles
 import System.IO.Unsafe  -- for binfile
 
-type ASM ctr a = Assembly (S.Seq Word8) ctr a
+type ASM ctr a = Assembler (S.Seq Word8) ctr a
 
-assemble_asm :: Num ctr => ASM ctr a -> B.ByteString
-assemble_asm = B.pack . F.toList . assemble
+asm :: Num ctr => Assembly (S.Seq Word8) a ctr -> ASM ctr a -> Assembly (S.Seq Word8) a ctr
+asm = assemble
 
-asm :: Num ctr => ctr -> ASM ctr a -> (B.ByteString, ctr, a)
-asm start (Assembly f) = let
-    (seq, finish, ret) = f start
-    in (B.pack (F.toList seq), finish, ret)
+asm_result :: Assembly (S.Seq Word8) a ctr -> B.ByteString
+asm_result = B.pack . F.toList . assembly_result
 
 byte :: Num ctr => Word8 -> ASM ctr ()
-byte = unit . S.singleton
+byte = unit_assembler . S.singleton
 
 bytes :: Num ctr => F.Foldable t => t Word8 -> ASM ctr ()
-bytes bs = Assembly (\c -> (S.fromList (F.toList bs), F.foldl (const . (+ 1)) c bs, ()))
+bytes bs = Assembler f where
+    f pos = (F.foldl (const . (+ 1)) pos bs, S.fromList (F.toList bs), ())
 
 ascii :: Num ctr => [Char] -> ASM ctr ()
 ascii = bytes . map (fromIntegral . ord)
 
 bytestring :: Num ctr => B.ByteString -> ASM ctr ()
-bytestring bs = Assembly (\c -> (S.fromList (B.unpack bs), c + fromIntegral (B.length bs), ()))
+bytestring bs = Assembler f where
+    f pos = (pos + fromIntegral (B.length bs), S.fromList (B.unpack bs), ())
 
 {-# NOINLINE binfile #-}
 binfile :: String -> B.ByteString
@@ -52,19 +52,19 @@ binfile = unsafePerformIO . B.readFile
 
 fill :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fill size b = if size >= 0
-    then Assembly (\c -> (S.replicate (fromIntegral size) b, c + size, ()))
+    then Assembler (\pos -> (pos + size, S.replicate (fromIntegral size) b, ()))
     else error$ "Tried to fill a block with negative size (did something assemble too large?)"
 
 fillto :: Integral ctr => ctr -> Word8 -> ASM ctr ()
-fillto end b = Assembly f where
-    f start = let
-        res = if start > end
-            then error$ "Tried to fillto with negative size (did something assemble too large?)"
-            else S.replicate (fromIntegral (end - start)) b
-        in (res, end, ())
+fillto target b = Assembler f where
+    f pos = let
+        payload = if target - pos < 0  -- allow target to be 0 on unsigned types for instance
+            then error$ "fillto was called too late (did something assemble too large?)"
+            else S.replicate (fromIntegral (target - pos)) b
+        in (target, payload, ())
 
 pad :: Integral ctr => ctr -> Word8 -> ASM ctr a -> ASM ctr a
-pad size = pad_assembly size . S.singleton
+pad size = pad_assembler size . S.singleton
 
 hex :: String -> [Word8]
 hex [] = []
@@ -181,9 +181,13 @@ cmp >>. branch = (cmp >>) . branch
 
 
 data Allocation a = Allocation a a deriving (Show, Eq, Ord)
-start (Allocation x _) = x
-size (Allocation _ x) = x
-end (Allocation start size) = start + size
+allocation_start (Allocation x _) = x
+allocation_size (Allocation _ x) = x
+allocation_end (Allocation start size) = start + size
+instance HasArea Allocation where
+    start = allocation_start
+    size = allocation_size
+    end = allocation_end
 
 allocate :: (Num a, Integral b) => a -> [b] -> [Allocation a]
 allocate start [] = []
