@@ -103,6 +103,7 @@ run engine note_table = mdo
         le16 command_loopb
         le16 command_delay
         le16 command_set_env
+        le16 command_call
         command_loopb <- startof$ mdo
             stx tmpy
             inx
@@ -143,10 +144,19 @@ run engine note_table = mdo
             ldayp pos >> stax NES.chn_env
             next
             jmp read_command
+        command_call <- startof$ mdo
+            ldayp pos >> sta command_ptr
+            next
+            ldayp pos >> sta (command_ptr + 1)
+            next
+            jsr call_sub
+            jmp read_command
+        call_sub <- startof$ mdo
+            jmpp command_ptr
         nothing
     nothing
 
-loopa_code : loopb_code : delay_code : set_env_code : _ = [0x80..] :: [Word8]
+loopa_code : loopb_code : delay_code : set_env_code : call_code : _ = [0x80..] :: [Word8]
 
 delaybyte d = if d <= 0xff
     then byte (fromIntegral d)
@@ -187,3 +197,6 @@ repeat code = do
 
 set_env :: Word8 -> ASM6502 ()
 set_env val = byte set_env_code >> byte val
+
+call :: Integral a => a -> ASM6502 ()
+call = op16 "ASoundEngine.call" call_code

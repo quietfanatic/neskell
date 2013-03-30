@@ -16,7 +16,8 @@ main = do
     trace ("ASDF") (return ())
     B.putStr $ asm_result prgbank
 
-[sound] = allocate 0x300 [S.datasize]
+[bg_color] = allocate8 0x10 [1]
+[sound] = allocate16 0x300 [S.datasize]
 
 prgbank_start = asm 0xc000 nothing
 
@@ -26,6 +27,7 @@ reset = asm prgbank_start $ mdo
      -- Set background color
     NES.set_ppuaddr 0x3f00
     0x0f ->* NES.ppudata
+    sta bg_color
 
      -- nmi for the sound
     NES.ppuctrl *<- NES.enable_nmi_bit
@@ -37,20 +39,30 @@ reset = asm prgbank_start $ mdo
 
 
     S.init sound
-    S.set_stream sound NES.pulse1 pulse1_stream2
-    S.set_stream sound NES.pulse2 pulse2_stream2
-    S.set_stream sound NES.triangle triangle_stream2
+    S.set_stream sound NES.pulse1 pulse1_stream1
+    S.set_stream sound NES.pulse2 pulse2_stream1
+    S.set_stream sound NES.triangle 0
 
     idle <- here
     jmp idle
 
 nmi = asm reset $ mdo
+    NES.set_ppuaddr 0x3f00
+    start bg_color *->* NES.ppudata
 
     S.run sound note_table
 
     rti
 
-data_begin = asm nmi nothing
+set_bg_blue = asm nmi $ mdo
+    0x02 ->* start bg_color
+    rts
+set_bg_orange = asm set_bg_blue $ mdo
+    0x08 ->* start bg_color
+    rts
+
+code_end = asm set_bg_orange nothing
+data_begin = asm code_end nothing
 
  -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
  -- but a couple tweaks may have been made to sharpen notes up a little
@@ -66,6 +78,7 @@ note_table = asm data_begin $ mapM_ le16 ([                         0x0000, 0x07
 
 pulse1_stream1 = asm note_table $ do
     S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x8)
+    S.call set_bg_blue
     S.repeat $ do
         hexdata "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
         hexdata "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
@@ -78,6 +91,7 @@ pulse2_stream1 = asm pulse1_stream1 $ do
 
 pulse1_stream2 = asm pulse2_stream1 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
+    S.call set_bg_orange
     S.repeat $ do
         S.loopa 2 $ do
             S.loopb 3 $ hexdata "3814 0004 3414 0004"
