@@ -52,7 +52,7 @@ run engine note_table = mdo
         tmpy = 0x02
         next = do
             iny
-            skip bne (incx (pos + 1))
+            skip bne (inc (pos + 1))
     ldxi 0x00
     run_one <- startof$ mdo
         decx etimer
@@ -83,24 +83,25 @@ run engine note_table = mdo
                 cmpi repeat_code >> beq do_repeat
                 cmpi set_env_code >> beq do_set_env
                 do_loop <- startof$ mdo
-                    ldax reps >> bne skip_start_loop
-                    ldayp pos  -- reps is zero; start loop
-                    beq infiloop  -- If the program says zero reps it means infinite
-                    stax reps
-                    skip_start_loop <- here
+                    ldax reps
+                    skip bne$ mdo
+                        ldayp pos  -- reps is zero; start loop
+                        beq infiloop  -- If the program says zero reps it means infinite
+                        stax reps
                     next
                     decx reps >> beq skip_goto
-                    do_goto <- here
-                    tya  -- reps is non-zero or loop is infitie
-                    sec
-                    sbcyp pos >> skip bcs (decx (pos + 1))
-                    tay
+                    do_goto <- startof$ mdo
+                        tya  -- reps is non-zero or loop is infitie
+                        sec
+                        sbcyp pos >> skip bcs (dec (pos + 1))
+                        tay
                     skip_goto <- here
                     next
                     jmp read_note
-                    infiloop <- here
-                    next
-                    jmp do_goto
+                    infiloop <- startof$ mdo
+                        next
+                        jmp do_goto
+                    nothing
                 do_repeat <- startof$ mdo
                     ldyx eprogram
                     ldax (eprogram + 1) >> sta (pos + 1)
