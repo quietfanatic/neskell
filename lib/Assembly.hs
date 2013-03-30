@@ -2,7 +2,7 @@
 module Assembly (
     Assembly(..), assembly_start, assembly_size, assembly_end, assembly_result, assembly_return,
     Assembler(..), assembler_function, assemble,
-    nothing, here, unit_assembler,
+    section, nothing, here, unit_assembler,
     pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
     enforce_counter, trace_counter,
     HasArea(..)
@@ -18,13 +18,15 @@ import Debug.Trace
 
  -- Yes, a and ctr are reversed in these two types.
  -- The reason is Assembly needs to be HasArea and Assembler needs to be Monad
-data Assembly mon a ctr = Assembly ctr ctr mon (Maybe a)
-assembly_start (Assembly x _ _ _) = x
-assembly_size (Assembly s e _ _) = e - s
-assembly_end (Assembly _ x _ _) = x
-assembly_result (Assembly _ _ x _) = x
-assembly_return (Assembly _ _ _ (Just x)) = x
-assembly_return (Assembly _ _ _ Nothing) = error$ "assembly_return called on an assembly that didn't have an associated return value (e.g. one that was converted from an Integer)"
+data Assembly mon a ctr = Assembly ctr ctr mon (Maybe mon) (Maybe a)
+assembly_start (Assembly x _ _ _ _) = x
+assembly_size (Assembly s e _ _ _) = e - s
+assembly_end (Assembly _ x _ _ _) = x
+assembly_contents (Assembly _ _ x _ _) = x
+assembly_result (Assembly _ _ _ (Just x) _) = x
+assembly_result (Assembly _ _ _ Nothing _) = error$ "assembly_result called on an assembly that didn't have an associated result (e.g. one that was created from 'section')."
+assembly_return (Assembly _ _ _ _ (Just x)) = x
+assembly_return (Assembly _ _ _ _ Nothing) = error$ "assembly_return called on an assembly that didn't have an associated return value (e.g. one that was converted from an Integer)."
 
 newtype Assembler mon ctr a = Assembler (ctr -> (ctr, mon, a))
 assembler_function (Assembler f) = f
@@ -33,7 +35,13 @@ assembler_function (Assembler f) = f
 assemble :: (Monoid mon, Num ctr) => Assembly mon a ctr -> Assembler mon ctr b -> Assembly mon b ctr
 assemble prev (Assembler f) = let
     (re, rp, rr) = f (assembly_end prev)
-    in Assembly (assembly_end prev) re (assembly_result prev <> rp) (Just rr)
+    in Assembly (assembly_end prev) re rp (Just (assembly_result prev <> rp)) (Just rr)
+
+section :: (Monoid mon, Num ctr) => Assembler mon ctr a -> Assembler mon ctr (Assembly mon a ctr)
+section (Assembler inner) = Assembler outer where
+    outer pos = let
+        (ie, ip, ir) = inner pos
+        in (ie, ip, Assembly pos ie ip Nothing (Just ir))
 
 nothing :: (Monoid mon, Num ctr) => Assembler mon ctr ()
 nothing = Assembler f where f pos = (pos, mempty, ())
@@ -121,7 +129,7 @@ instance (Monoid mon, Num ctr) => Num (Assembly mon a ctr) where
     (*) = error$ "Can't (*) Assembly."
     abs = error$ "Can't abs Assembly."
     signum = error$ "Can't signum Assembly."
-    fromInteger x = Assembly (fromInteger x) (fromInteger x) mempty Nothing
+    fromInteger x = Assembly (fromInteger x) (fromInteger x) mempty (Just mempty) Nothing
 
 instance Enum ctr => Enum (Assembly mon a ctr) where
     succ = error$ "Can't succ Assembly."
@@ -143,5 +151,5 @@ instance (Monoid mon, Integral ctr) => Integral (Assembly mon a ctr) where
     toInteger = toInteger . assembly_start
 
 instance (Monoid mon, Bounded ctr) => Bounded (Assembly mon a ctr) where
-    minBound = Assembly minBound minBound mempty Nothing
-    maxBound = Assembly maxBound maxBound mempty Nothing
+    minBound = Assembly minBound minBound mempty (Just mempty) Nothing
+    maxBound = Assembly maxBound maxBound mempty (Just mempty) Nothing

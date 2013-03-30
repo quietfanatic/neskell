@@ -55,15 +55,15 @@ run engine note_table = mdo
             skip bne (inc (pos + 1))
     ldxi 0x00
     run_one <- here
-    (read_command, done_reading) <- mdo
+    read_commands <- mdo
         ldax (position + 1)
         beq just_wait
         decx timer
         bne just_wait
-        (read_command, done_reading) <- mdo
+        read_commands <- mdo
             ldyx position
             sta (pos + 1)
-            (read_command, done_reading) <- startend$ mdo
+            read_commands <- section$ mdo
                 ldayp pos
                 next
                 sty tmpy
@@ -79,32 +79,32 @@ run engine note_table = mdo
                     ldayp pos  -- Also read a delay.
                     skip bne $ mdo
                         next
-                        jmp read_command
+                        jmp read_commands
                     next
                     stax timer
-                    jmp done_reading
-                lday command_table  -- Do a special comand
+                    jmp (end read_commands)
+                lday (start command_table)  -- Do a special comand
                 sta command_ptr
-                lday (command_table + 1)
+                lday (start command_table + 1)
                 sta (command_ptr + 1)
                 ldy tmpy
                 jmpp command_ptr
             tya
             stax position
             lda (pos + 1) >> stax (position + 1)
-            return (read_command, done_reading)
+            return read_commands
         just_wait <- here
-        return (read_command, done_reading)
+        return read_commands
     inx >> inx >> inx >> inx
     skip (cpxi 0x0c >>. beq) (jmp run_one)
-    jmp done
-    (command_table, done) <- startend$ mdo
+    jmp (end command_table)
+    command_table <- section$ mdo
         le16 command_loopa
-        le16 command_loopb
-        le16 command_delay
-        le16 command_set_env
-        le16 command_call
-        command_loopb <- startof$ mdo
+        le16 (start command_loopb)
+        le16 (start command_delay)
+        le16 (start command_set_env)
+        le16 (start command_call)
+        command_loopb <- section$ mdo
             stx tmpy
             inx
             jmp command_loop_start
@@ -125,8 +125,8 @@ run engine note_table = mdo
                 next
                 next
                 ldx tmpy
-                jmp read_command
-            do_goto <- startof$ mdo
+                jmp read_commands
+            do_goto <- section$ mdo
                 ldx tmpy
                 ldayp pos  -- reps is non-zero or loop is infinite
                 sta tmpy
@@ -134,24 +134,24 @@ run engine note_table = mdo
                 ldayp pos
                 sta (pos + 1)
                 ldy tmpy
-                jmp read_command
+                jmp read_commands
             return command_loop_start
-        command_delay <- startof$ mdo
+        command_delay <- section$ mdo
             ldayp pos >> stax timer
             next
-            jmp done_reading
-        command_set_env <- startof$ mdo
+            jmp (end read_commands)
+        command_set_env <- section$ mdo
             ldayp pos >> stax NES.chn_env
             next
-            jmp read_command
-        command_call <- startof$ mdo
+            jmp read_commands
+        command_call <- section$ mdo
             ldayp pos >> sta command_ptr
             next
             ldayp pos >> sta (command_ptr + 1)
             next
-            jsr call_sub
-            jmp read_command
-        call_sub <- startof$ mdo
+            jsr (start call_sub)
+            jmp read_commands
+        call_sub <- section$ mdo
             jmpp command_ptr
         nothing
     nothing
