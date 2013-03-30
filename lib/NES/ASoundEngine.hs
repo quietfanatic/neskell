@@ -30,10 +30,10 @@ init engine = validate engine $ mdo
     init_part NES.pulse2
     init_part NES.triangle
 
-set_program engine chn prog = validate engine $ do
-    ldai (low prog)
+set_stream engine chn stream = validate engine $ do
+    ldai (low stream)
     sta (position engine + chn)
-    ldai (high prog)
+    ldai (high stream)
     sta (position engine + chn + 1)
 
 run engine note_table = mdo

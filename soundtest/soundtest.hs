@@ -44,8 +44,8 @@ reset_section = mdo
     NES.apumode *<- NES.sequencer_mode_bit .|. NES.disable_frame_irq_bit
 
     S.init sound
-    S.set_program sound NES.pulse1 pulse1_program
-    S.set_program sound NES.pulse2 pulse2_program
+    S.set_stream sound NES.pulse1 pulse1_stream
+    S.set_stream sound NES.pulse2 pulse2_stream
 
     idle <- here
     jmp idle
@@ -56,8 +56,8 @@ nmi_section = mdo
 
     rti
 
-[note_table, pulse1_program, pulse2_program, triangle_program]
-    = allocate16 data_begin [2 * 0x5f, length pulse1_program1, length pulse2_program1, length triangle_program2]
+[note_table, pulse1_stream, pulse2_stream, triangle_stream]
+    = allocate16 data_begin [2 * 0x5f, length pulse1_stream1, length pulse2_stream1, length triangle_stream2]
 
  -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
  -- but a couple tweaks may have been made to sharpen notes up a little
@@ -71,29 +71,29 @@ note_table' = [                                                     0x0000, 0x07
     0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4c-0x57)
     0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16]                             -- c9-f#9 (0x58-0x5e)
 
-pulse1_program1 = S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x8)
+pulse1_stream1 = S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x8)
     ++ hex "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
     ++ hex "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
     ++ S.loop 0 0x2f
 
-pulse2_program1 = S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x6)
+pulse2_stream1 = S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x6)
     ++ hex "1480 1280 1040 1240 1480"
     ++ hex "1080 1280 1480 1280"
     ++ S.loop 0 0x15
 
-pulse1_program2 = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
+pulse1_stream2 = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004"
     ++ S.loop 2 0x23
     ++ hex "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
     ++ S.loop 4 0x23
     ++ S.loop 0 0x49
-pulse2_program2 = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
+pulse2_stream2 = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
     ++ S.loop 2 0x23
     ++ hex "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
     ++ S.loop 4 0x23
     ++ S.loop 0 0x49
-triangle_program2 = S.set_env 0x81
+triangle_stream2 = S.set_env 0x81
     ++ hex "00c0 00c0"
     ++ hex "0030 1412 1912 1c06 0006 1c24 1330 000c"
     ++ hex "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
@@ -103,6 +103,6 @@ triangle_program2 = S.set_env 0x81
 
 data_section = mdo
     provide note_table $ sequence $ map le16 $ note_table'
-    provide pulse1_program $ bytes pulse1_program1
-    provide pulse2_program $ bytes pulse2_program1
+    provide pulse1_stream $ bytes pulse1_stream1
+    provide pulse2_stream $ bytes pulse2_stream1
 
