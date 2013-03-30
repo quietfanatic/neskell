@@ -73,37 +73,38 @@ note_table' = [                                                     0x0000, 0x07
 
 (pulse1_stream1, _, _) = asm 0 $ do
     S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x8)
-    hexdata "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
-    hexdata "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
-    S.loop 0 0x2f
+    S.loop 0 $ do
+        hexdata "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
+        hexdata "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
 
 (pulse2_stream1, _, _) = asm 0 $ do
     S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x6)
-    hexdata "1480 1280 1040 1240 1480"
-    hexdata "1080 1280 1480 1280"
-    S.loop 0 0x15
+    S.loop 0 $ do
+        hexdata "1480 1280 1040 1240 1480"
+        hexdata "1080 1280 1480 1280"
 
 (pulse1_stream2, _, _) = asm 0 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
-    hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004"
-    S.loop 2 0x23
-    hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
-    S.loop 4 0x23
-    S.loop 0 0x49
+    S.loop 0 $ do
+        S.loop 2 $ do
+            hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004"
+        S.loop 4 $ do
+            hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
 (pulse2_stream2, _, _) = asm 0 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
-    hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
-    S.loop 2 0x23
-    hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
-    S.loop 4 0x23
-    S.loop 0 0x49
+    S.loop 0 $ do
+        S.loop 2 $ do
+            hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
+        S.loop 4 $ do
+            hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
 (triangle_stream2, _, _) = asm 0 $ do
     S.set_env 0x81
-    hexdata "00c0 00c0"
-    hexdata "0030 1412 1912 1c06 0006 1c24 1330 000c"
-    hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
-    hexdata "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
-    S.loop 0 0x43
+    S.loop 0 $ do
+        hexdata "00c0 00c0"
+        hexdata "0030 1412 1912 1c06 0006 1c24 1330 000c"
+        hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
+        hexdata "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
+
 
 data_section = mdo
     provide note_table $ sequence $ map le16 $ note_table'

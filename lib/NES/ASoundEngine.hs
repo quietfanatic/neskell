@@ -111,5 +111,9 @@ run engine note_table = mdo
 
 loop_code : set_env_code : _ = [0x80..] :: [Word8]
 
-loop times offset = byte loop_code >> byte times >> byte offset
+loop times code = do
+    s <- sizeof code
+    byte loop_code
+    byte times
+    byte (s + 3)
 set_env val = byte set_env_code >> byte val
