@@ -7,7 +7,7 @@ import Data.Word
 import Data.Int
 import qualified Data.Bits as B
 import qualified Data.Sequence as S
-import Assembly
+import Assembler
 import ASM
 import Text.Printf
 

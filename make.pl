@@ -24,7 +24,7 @@ workflow {
         };
     }
 
-    subdep 'lib/ASM.hs', 'lib/Assembly.hs';
+    subdep 'lib/ASM.hs', 'lib/Assembler.hs';
     subdep 'lib/ASM6502.hs', 'lib/ASM.hs';
     subdep 'lib/NES.hs', 'lib/ASM6502.hs';
     subdep 'lib/NES/ASoundEngine.hs', 'lib/NES.hs';

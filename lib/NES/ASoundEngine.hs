@@ -5,7 +5,7 @@
 module NES.ASoundEngine where
 
 import Data.Word
-import Assembly
+import Assembler
 import ASM
 import ASM6502
 import NES

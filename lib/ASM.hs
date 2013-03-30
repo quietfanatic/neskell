@@ -20,7 +20,7 @@ import qualified Data.Sequence as S
 import qualified Data.Foldable as F
 import qualified Data.ByteString as B
 import Text.Printf
-import Assembly
+import Assembler
 import Unsafe.Coerce  -- for serializing floats and doubles
 import System.IO.Unsafe  -- for binfile
 
