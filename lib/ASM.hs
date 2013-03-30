@@ -44,7 +44,7 @@ ascii :: Num ctr => [Char] -> ASM ctr ()
 ascii = bytes . map (fromIntegral . ord)
 
 bytestring :: Num ctr => B.ByteString -> ASM ctr ()
-bytestring bs = Assembly (\c -> (S.fromList (B.unpack bs), fromIntegral (B.length bs), ()))
+bytestring bs = Assembly (\c -> (S.fromList (B.unpack bs), c + fromIntegral (B.length bs), ()))
 
 {-# NOINLINE binfile #-}
 binfile :: String -> B.ByteString
