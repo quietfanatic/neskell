@@ -49,6 +49,7 @@ run engine note_table = mdo
         pos = 0x00  -- 0x00 stays 0 (the real pointer is y:0x01)
         tmpy = 0x02
         command_ptr = 0x03
+        tmppos = 0x05
         next = do
             iny
             skip bne (inc (pos + 1))
@@ -105,20 +106,24 @@ run engine note_table = mdo
             ldax reps
             skip bne$ mdo
                 ldayp pos  -- reps is zero; start loop
-                beq infiloop  -- If the program says zero reps it means infinite
+                skip bne $ mdo
+                    next  -- If the program says zero reps it means infinite
+                    jmp do_goto
                 stax reps
             next
-            decx reps >> beq skip_goto
-            (do_goto, skip_goto) <- startend$ mdo
-                tya  -- reps is non-zero or loop is infitie
-                sec
-                sbcyp pos >> skip bcs (dec (pos + 1))
-                tay
-            next
-            jmp read_command
-            infiloop <- startof$ mdo
+            decx reps
+            skip bne $ mdo
                 next
-                jmp do_goto
+                next
+                jmp read_command
+            do_goto <- startof$ mdo
+                ldayp pos  -- reps is non-zero or loop is infinite
+                sta tmpy
+                next
+                ldayp pos
+                sta (pos + 1)
+                ldy tmpy
+                jmp read_command
             nothing
         command_delay <- startof$ mdo
             ldayp pos >> stax timer
@@ -148,12 +153,11 @@ delay d = byte delay_code >> delaybyte d
 
 loop :: Word8 -> ASM6502 () -> ASM6502 ()
 loop times code = do
-    s <- sizeof code
+    begin <- here
+    code
     byte loop_code
     byte times
-    case no_overflow (s + 3) of
-        Just w8 -> byte w8
-        Nothing -> fail$ "Loop is too large.  This restriction should be lifted soon."
+    le16 begin
 
 set_env :: Word8 -> ASM6502 ()
 set_env val = byte set_env_code >> byte val

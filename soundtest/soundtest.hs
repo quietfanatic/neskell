@@ -32,13 +32,14 @@ reset = asm prgbank_start $ mdo
     NES.ppumask *<- 0
 
      -- enable sound
-    NES.apuctrl *<- NES.enable_pulse1 .|. NES.enable_pulse2
+    NES.apuctrl *<- NES.enable_pulse1 .|. NES.enable_pulse2 .|. NES.enable_triangle
     NES.apumode *<- NES.sequencer_mode_bit .|. NES.disable_frame_irq_bit
 
 
     S.init sound
-    S.set_stream sound NES.pulse1 pulse1_stream1
-    S.set_stream sound NES.pulse2 pulse2_stream1
+    S.set_stream sound NES.pulse1 pulse1_stream2
+    S.set_stream sound NES.pulse2 pulse2_stream2
+    S.set_stream sound NES.triangle triangle_stream2
 
     idle <- here
     jmp idle
