@@ -8,7 +8,7 @@ module Assembler (
     section, nothing, here, unit_assembler,
     pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
     enforce_counter, provide, trace_counter,
-    get_annotation, get_annotation_default, set_annotation, get_annotations,
+    get_annotation, get_annotation_default, set_annotation,
     area, assemble_area, get_area, appendable_area_name, current_area,
     section_merge
 ) where
@@ -106,6 +106,7 @@ return_assembler x = Assembler f where f (ann, pos) = (ann, pos, mempty, x)
 fail_assembler :: Integral ctr => String -> Assembler mon ctr a
 fail_assembler mess = Assembler f where
     f (ann, pos) = let
+        err = error$ printf "%s%s at 0x%x" mess (appendable_area_name ann) (toInteger pos)
         in (ann, pos, err, err)
 
  -- This is for being as lazy as possible
