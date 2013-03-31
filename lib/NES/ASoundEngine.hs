@@ -211,4 +211,4 @@ set_env :: Word8 -> ASM6502 ()
 set_env val = byte set_env_code >> byte val
 
 call :: Integral a => a -> ASM6502 ()
-call = op16 "ASoundEngine.call" call_code
+call = op16 "NES.ASoundEngine.call" call_code
