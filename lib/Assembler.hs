@@ -25,27 +25,30 @@ import Debug.Trace
 data Unknown
 type Annotations = M.Map TypeRep Unknown
 
-data Section mon ctr a = Section ctr ctr mon mon a
+data Section mon ctr a = Section Annotations ctr ctr mon mon a
+section_annotations :: Section mon ctr a -> Annotations
+section_annotations (Section x _ _ _ _ _) = x
 section_start :: Section mon ctr a -> ctr
-section_start (Section x _ _ _ _) = x
+section_start (Section _ x _ _ _ _) = x
 start :: Section mon ctr a -> ctr
 start = section_start
 section_size :: Num ctr => Section mon ctr a -> ctr
-section_size (Section s e _ _ _) = e - s
+section_size (Section _ s e _ _ _) = e - s
 size :: Num ctr => Section mon ctr a -> ctr
 size = section_size
 section_end :: Section mon ctr a -> ctr
-section_end (Section _ x _ _ _) = x
+section_end (Section _ _ x _ _ _) = x
 end :: Section mon ctr a -> ctr
 end = section_end
 section_contents :: Section mon ctr a -> mon
-section_contents (Section _ _ x _ _) = x
+section_contents (Section _ _ _ x _ _) = x
 section_result :: Section mon ctr a -> mon
-section_result (Section _ _ _ x _) = x
+section_result (Section _ _ _ _ x _) = x
 section_return :: Section mon ctr a -> a
-section_return (Section _ _ _ _ x) = x
+section_return (Section _ _ _ _ _ x) = x
 
 nosomething something name = error$ "Section generated with " ++ name ++ " has no " ++ something
+noannotations = nosomething "section_annotations"
 nocontents = nosomething "section_contents"
 noresult = nosomething "section_result"
 noreturn = nosomething "section_return"
@@ -57,20 +60,20 @@ assembler_function (Assembler f) = f
  -- This can be called like "section 0 ..." because there's a Num Section instance.
 assemble :: (Monoid mon, Num ctr) => Section mon ctr a -> Assembler mon ctr b -> Section mon ctr b
 assemble prev (Assembler f) = let
-    (_, re, rp, rr) = f (M.empty, section_end prev)
-    in Section (section_end prev) re rp (section_result prev <> rp) rr
+    (ann, re, rp, rr) = f (M.empty, section_end prev)
+    in Section ann (section_end prev) re rp (section_result prev <> rp) rr
 
 allocate :: (Num ctr, Integral siz) => Section mon ctr a -> [siz] -> [Section mon ctr b]
 allocate prev [] = []
 allocate prev (z:zs) = let
-    s = Section (end prev) (end prev + fromIntegral z) (nocontents "allocate") (noresult "allocate") (noreturn "allocate")
+    s = Section (noannotations "allocate") (end prev) (end prev + fromIntegral z) (nocontents "allocate") (noresult "allocate") (noreturn "allocate")
     in s : allocate s zs
 
 section :: (Monoid mon, Num ctr) => Assembler mon ctr a -> Assembler mon ctr (Section mon ctr a)
 section (Assembler inner) = Assembler outer where
     outer (ann1, pos) = let
         (ann2, ie, ip, ir) = inner (ann1, pos)
-        in (ann2, ie, ip, Section pos ie ip (noresult "section") ir)
+        in (ann2, ie, ip, Section (noannotations "section") pos ie ip (noresult "section") ir)
 
 nothing :: (Monoid mon, Num ctr) => Assembler mon ctr ()
 nothing = Assembler f where f (ann, pos) = (ann, pos, mempty, ())
@@ -168,16 +171,16 @@ instance (Monoid mon, Integral ctr) => MonadFix (Assembler mon ctr) where
     mfix = fix_assembler
 
 instance (Monoid mon, Num ctr) => Num (Section mon ctr a) where
-    a + b = Section (start a + start b) (start a + start b) mempty mempty (noreturn "(+)")
-    a - b = Section (start a - start b) (start a + start b) mempty mempty (noreturn "(-)")
+    a + b = Section (noannotations "(+)") (start a + start b) (start a + start b) mempty mempty (noreturn "(+)")
+    a - b = Section (noannotations "(+)") (start a - start b) (start a + start b) mempty mempty (noreturn "(-)")
     (*) = cantXsection "(*)"
     abs = cantXsection "abs"
     signum = cantXsection "signum"
-    fromInteger x = Section (fromInteger x) (fromInteger x) mempty mempty (noreturn "fromInteger")
+    fromInteger x = Section M.empty (fromInteger x) (fromInteger x) mempty mempty (noreturn "fromInteger")
 
 instance (Monoid mon, Num ctr, Enum ctr) => Enum (Section mon ctr a) where
-    succ a = Section (succ (start a)) (succ (start a)) mempty mempty (noreturn "succ")
-    pred a = Section (pred (start a)) (pred (start a)) mempty mempty (noreturn "pred")
+    succ a = Section (noannotations "succ") (succ (start a)) (succ (start a)) mempty mempty (noreturn "succ")
+    pred a = Section (noannotations "pred") (pred (start a)) (pred (start a)) mempty mempty (noreturn "pred")
     toEnum = error$ "Can't toEnum Section"
     fromEnum = error$ "Can't fromEnum Section (you can toInteger it though)"
 
@@ -200,11 +203,11 @@ instance (Monoid mon, Integral ctr) => Integral (Section mon ctr a) where
     toInteger = toInteger . section_start
 
 instance (Monoid mon, Bounded ctr) => Bounded (Section mon ctr a) where
-    minBound = Section minBound minBound mempty mempty (noreturn "minBound")
-    maxBound = Section maxBound maxBound mempty mempty (noreturn "maxBound")
+    minBound = Section (noannotations "minBound") minBound minBound mempty mempty (noreturn "minBound")
+    maxBound = Section (noannotations "maxBound") maxBound maxBound mempty mempty (noreturn "maxBound")
 
 section_merge :: (Monoid mon, Integral ctr) => Section mon ctr a -> Section mon ctr b -> Section mon ctr b
 section_merge a b = if end a == start b
-    then Section (start a) (end b) (section_contents a <> section_contents b) (noresult "section_merge") (section_return b)
+    then Section (noannotations "section_merge") (start a) (end b) (section_contents a <> section_contents b) (noresult "section_merge") (section_return b)
     else error$ printf "Tried to merge nonadjacent sections (0x%x..0x%x and 0x%x..0x%x)"
         (toInteger (start a)) (toInteger (end a)) (toInteger (start b)) (toInteger (end b))
