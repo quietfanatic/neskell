@@ -1,10 +1,11 @@
 
-{-# LANGUAGE RecursiveDo #-}
+{-# LANGUAGE RecursiveDo, DeriveDataTypeable #-}
 
  -- Please import this qualified.
 module NES.ASoundEngine where
 
 import Data.Word
+import Data.Typeable
 import Assembler
 import ASM
 import ASM6502
@@ -172,19 +173,20 @@ note n d = do
 delay :: Word8 -> ASM6502 ()
 delay d = byte delay_code >> delaybyte d
 
-loopa :: Word8 -> ASM6502 () -> ASM6502 ()
-loopa times code = do
-    begin <- here
-    code
-    byte loopa_code
-    byte times
-    le16 begin
+newtype LoopCount = LoopCount Int deriving (Typeable)
 
-loopb :: Word8 -> ASM6502 () -> ASM6502 ()
-loopb times code = do
+loop_code spot 0 = loopa_code
+loop_code spot 1 = loopb_code
+loop_code spot _ = error$ printf "Too many nested loops in music stream at 0x%x" spot
+
+loop :: Word8 -> ASM6502 () -> ASM6502 ()
+loop times code = do
     begin <- here
+    LoopCount c <- get_annotation_default (LoopCount 0)
+    set_annotation (Just (LoopCount (c + 1)))
     code
-    byte loopb_code
+    set_annotation (Just (LoopCount c))
+    byte (loop_code begin c)
     byte times
     le16 begin
 

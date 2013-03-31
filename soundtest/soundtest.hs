@@ -38,9 +38,9 @@ reset = asm prgbank_start $ mdo
 
 
     S.init sound
-    S.set_stream sound NES.pulse1 pulse1_stream1
-    S.set_stream sound NES.pulse2 pulse2_stream1
-    S.set_stream sound NES.triangle 0
+    S.set_stream sound NES.pulse1 pulse1_stream2
+    S.set_stream sound NES.pulse2 pulse2_stream2
+    S.set_stream sound NES.triangle triangle_stream2
 
     idle <- here
     jmp idle
@@ -92,17 +92,17 @@ pulse1_stream2 = asm pulse2_stream1 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     S.call set_bg_orange
     S.repeat $ do
-        S.loopa 2 $ do
-            S.loopb 3 $ hexdata "3814 0004 3414 0004"
+        S.loop 2 $ do
+            S.loop 3 $ hexdata "3814 0004 3414 0004"
             hexdata "3714 0004 3414 0004"
-        S.loopa 4 $ do
+        S.loop 4 $ do
             hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
 pulse2_stream2 = asm pulse1_stream2 $ do
     S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     S.repeat $ do
-        S.loopa 2 $ do
+        S.loop 2 $ do
             hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
-        S.loopa 4 $ do
+        S.loop 4 $ do
             hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
 triangle_stream2 = asm pulse2_stream2 $ do
     S.set_env 0x81
