@@ -1,12 +1,15 @@
 
+{-# LANGUAGE DeriveDataTypeable #-}
+
 module Assembler (
     Section(..), section_start, section_size, section_end, section_result, section_return,
     start, size, end,
-    Assembler(..), assembler_function, assemble, allocate,
+    Assembler(..), assembler_function, assemble, allocate, allocate1,
     section, nothing, here, unit_assembler,
     pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
     enforce_counter, provide, trace_counter,
-    get_annotation, get_annotation_default, set_annotation,
+    get_annotation, get_annotation_default, set_annotation, get_annotations,
+    area, assemble_area, get_area, appendable_area_name, current_area,
     section_merge
 ) where
 
@@ -24,6 +27,10 @@ import Debug.Trace
 
 data Unknown
 type Annotations = M.Map TypeRep Unknown
+annotations_get :: Typeable a => Annotations -> Maybe a
+annotations_get = f' undefined where
+    f' :: Typeable a => a -> Annotations -> Maybe a
+    f' undef = unsafeCoerce . M.lookup (typeOf undef)
 
 data Section mon ctr a = Section Annotations ctr ctr mon mon a
 section_annotations :: Section mon ctr a -> Annotations
@@ -69,11 +76,20 @@ allocate prev (z:zs) = let
     s = Section (noannotations "allocate") (end prev) (end prev + fromIntegral z) (nocontents "allocate") (noresult "allocate") (noreturn "allocate")
     in s : allocate s zs
 
+allocate1 :: (Num ctr, Integral siz) => Section mon ctr a -> siz -> Section mon ctr b
+allocate1 prev z = Section (noannotations "allocate1") (end prev) (end prev + fromIntegral z) (nocontents "allocate1") (noresult "allocate1") (noreturn "allocate1")
+
 section :: (Monoid mon, Num ctr) => Assembler mon ctr a -> Assembler mon ctr (Section mon ctr a)
 section (Assembler inner) = Assembler outer where
     outer (ann1, pos) = let
         (ann2, ie, ip, ir) = inner (ann1, pos)
-        in (ann2, ie, ip, Section (noannotations "section") pos ie ip (noresult "section") ir)
+        in (ann2, ie, ip, Section ann2 pos ie ip (noresult "section") ir)
+
+section_ :: (Monoid mon, Num ctr) => Assembler mon ctr a -> Assembler mon ctr (Section mon ctr ())
+section_ (Assembler inner) = Assembler outer where
+    outer (ann1, pos) = let
+        (ann2, ie, ip, ir) = inner (ann1, pos)
+        in (ann2, ie, ip, Section ann2 pos ie ip (noresult "section") ())
 
 nothing :: (Monoid mon, Num ctr) => Assembler mon ctr ()
 nothing = Assembler f where f (ann, pos) = (ann, pos, mempty, ())
@@ -88,10 +104,16 @@ return_assembler :: Monoid mon => a -> Assembler mon ctr a
 return_assembler x = Assembler f where f (ann, pos) = (ann, pos, mempty, x)
 
 fail_assembler :: Integral ctr => String -> Assembler mon ctr a
-fail_assembler mess = Assembler f where  -- Be as lazy as possible.
+fail_assembler mess = Assembler f where
     f (ann, pos) = let
-        err = error$ printf "%s at 0x%x" mess (toInteger pos)
         in (ann, pos, err, err)
+
+ -- This is for being as lazy as possible
+fail_assembler_if :: (Monoid mon, Integral ctr) => Bool -> String -> Assembler mon ctr ()
+fail_assembler_if cond mess = Assembler f where
+    f (ann, pos) = let
+        err = error$ printf "%s%s at 0x%x" mess (appendable_area_name ann) (toInteger pos)
+        in (ann, pos, if cond then err else mempty, ())
 
 append_assembler :: Monoid mon => Assembler mon ctr a -> Assembler mon ctr b -> Assembler mon ctr b
 append_assembler (Assembler left) (Assembler right) = Assembler f where
@@ -118,8 +140,8 @@ pad_assembler size filling (Assembler inner) = Assembler f where
     f (ann1, pos) = let
         (ann2, ie, ip, ir) = inner (ann1, pos)
         payload = if ie > pos + size
-            then error$ printf "Code given to pad_assembler was larger than the alloted size (0x%x - 0x%x > 0x%x)"
-                               (toInteger ie) (toInteger pos) (toInteger size)
+            then error$ printf "Code given to pad_assembler was larger than the alloted size%s (0x%x - 0x%x > 0x%x)"
+                               (appendable_area_name ann2) (toInteger ie) (toInteger pos) (toInteger size)
             else ip <> F.fold (replicate (fromIntegral (pos + size - ie)) filling)
         in (ann2, pos + size, payload, ir)
 
@@ -128,7 +150,8 @@ enforce_counter expected = Assembler f where
     f (ann, got) = let
         payload = if got == expected
             then mempty
-            else error$ printf "Something was misaligned (0x%x /= 0x%x)" (toInteger got) (toInteger expected)
+            else error$ printf "Something was misaligned%s (0x%x /= 0x%x)"
+                               (appendable_area_name ann) (toInteger got) (toInteger expected)
         in (ann, expected, payload, ())
 
 provide :: (Monoid mon, Integral ctr) => Section mon ctr a -> Assembler mon ctr b -> Assembler mon ctr b
@@ -151,15 +174,62 @@ set_annotation x = Assembler f where
     f (ann, pos) = (ann2 ann, pos, mempty, ())
 
 get_annotation :: (Typeable a, Monoid mon) => Assembler mon ctr (Maybe a)
-get_annotation = get_annotation' undefined
-
-get_annotation' :: (Typeable a, Monoid mon) => a -> Assembler mon ctr (Maybe a)
-get_annotation' undef = Assembler f where
-    f (ann, pos) = (ann, pos, mempty, (unsafeCoerce (M.lookup (typeOf undef) ann) :: Maybe a))
+get_annotation = f' undefined where
+    f' :: (Typeable a, Monoid mon) => a -> Assembler mon ctr (Maybe a)
+    f' undef = Assembler f where
+        f (ann, pos) = (ann, pos, mempty, annotations_get ann)
 
 get_annotation_default :: (Typeable a, Monoid mon) => a -> Assembler mon ctr a
 get_annotation_default def = Assembler f where
-    f (ann, pos) = (ann, pos, mempty, fromMaybe def (unsafeCoerce (M.lookup (typeOf def) ann)))
+    f (ann, pos) = (ann, pos, mempty, fromMaybe def (annotations_get ann))
+
+modify_annotation :: (Typeable a, Monoid mon, Integral ctr) => a -> (a -> a) -> Assembler mon ctr ()
+modify_annotation def f = do
+    ann <- get_annotation_default def
+    set_annotation (Just (f ann))
+
+newtype AllAreas = AllAreas (M.Map String [Section () () ()]) deriving (Typeable)
+newtype CurrentArea = CurrentArea String deriving (Typeable)
+
+area :: (Monoid mon, Integral ctr) => String -> Assembler mon ctr a -> Assembler mon ctr (Section mon ctr a)
+area name code = do
+    set_annotation (Just (CurrentArea name))
+    sect <- section code
+    set_annotation (Nothing :: Maybe CurrentArea)
+    let unitsect = Section (section_annotations sect)
+                           (section_start sect)
+                           (section_end sect)
+                           (section_contents sect)
+                           (section_result sect)
+                           ()
+        insertsect = unsafeCoerce unitsect :: Section () () ()
+        mod (AllAreas m) = AllAreas (M.insertWith (++) name [insertsect] m)
+    modify_annotation (AllAreas M.empty) mod
+    return sect
+
+appendable_area_name :: Annotations -> String
+appendable_area_name ann = case annotations_get ann of
+    Just (CurrentArea name) -> " in area \"" ++ name ++ "\""
+    Nothing -> ""
+
+assemble_area :: (Monoid mon, Integral ctr) => Section mon ctr a -> String -> Assembler mon ctr b -> Section mon ctr b
+assemble_area prev name code = assemble prev (area name code >>= return . section_return)
+
+get_area :: Section mon ctr a -> String -> Section mon ctr ()
+get_area sec name = case annotations_get (section_annotations sec) of
+    Just (AllAreas areas) -> case M.lookup name areas of
+        Just [area] -> unsafeCoerce area
+        Just (area:_) -> error$ "Can't get_area \"" ++ name ++ "\" because multiple areas with that name were assembled."
+        _ -> error$ "Can't get_area \"" ++ name ++ "\" because no area with that name was assembled."
+    Nothing -> error$ "Can't get_area \"" ++ name ++ "\" because no area with that name was assembled."
+
+current_area :: (Monoid mon, Integral ctr) => Assembler mon ctr (Maybe String)
+current_area = do
+    x <- get_annotation
+    let ret = case x of
+            Just (CurrentArea name) -> Just name
+            Nothing -> Nothing
+    return ret
 
 instance (Monoid mon, Integral ctr) => Monad (Assembler mon ctr) where
     return = return_assembler

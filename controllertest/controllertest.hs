@@ -2,7 +2,7 @@
 {-# LANGUAGE RecursiveDo #-}
 
 import qualified Data.ByteString as B
-import Assembler
+import Assembly
 import ASM
 import ASM6502
 import qualified NES

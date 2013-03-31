@@ -6,7 +6,7 @@ module ASM (
     byte, bytes, ascii, bytestring, binfile, fill, fillto, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here,
-    asm, asm_result, no_overflow, enforce_no_overflow,
+    asm, asm_area, asm_result, no_overflow,
     startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
     allocate8, allocate16, allocate32, allocate64
@@ -30,6 +30,9 @@ type ASMSection ctr a = Section (S.Seq Word8) ctr a
 asm :: Num ctr => ASMSection ctr a -> ASM ctr a -> ASMSection ctr a
 asm = assemble
 
+asm_area :: Integral ctr => ASMSection ctr a -> String -> ASM ctr a -> ASMSection ctr a
+asm_area = assemble_area
+
 asm_result :: ASMSection ctr a -> B.ByteString
 asm_result = B.pack . F.toList . section_result
 
@@ -52,15 +55,19 @@ binfile :: String -> B.ByteString
 binfile = unsafePerformIO . B.readFile
 
 fill :: Integral ctr => ctr -> Word8 -> ASM ctr ()
-fill size b = if size >= 0
-    then Assembler (\(ann, pos) -> (ann, pos + size, S.replicate (fromIntegral size) b, ()))
-    else error$ "Tried to fill a block with negative size (did something assemble too large?)"
+fill size b = Assembler f where
+    f (ann, pos) = if size >= 0
+        then (ann, pos + size, S.replicate (fromIntegral size) b, ())
+        else (ann, pos + size, err ann pos, ())
+    err ann pos = error$ printf "Tried to fill a block with negative size%s at 0x%x (did something assemble too large?)"
+                                (appendable_area_name ann) (toInteger pos)
 
 fillto :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fillto target b = Assembler f where
     f (ann, pos) = let
         payload = if target - pos < 0  -- allow target to be 0 on unsigned types for instance
-            then error$ "fillto was called too late (did something assemble too large?)"
+            then error$ printf "fillto was called too late%s at 0x%x (did something assemble too large?)"
+                               (appendable_area_name ann) (toInteger pos)
             else S.replicate (fromIntegral (target - pos)) b
         in (ann, target, payload, ())
 
@@ -122,16 +129,6 @@ no_overflow' min max x = if toInteger min <= toInteger x && toInteger x <= toInt
 
 no_overflow :: (Integral a, Integral b, Bounded b) => a -> Maybe b
 no_overflow = no_overflow' minBound maxBound
-
-enforce_no_overflow' :: (Integral a, Integral b, Integral ctr) => b -> b -> String -> ctr -> a -> b
-enforce_no_overflow' min max name pos x = if toInteger min <= toInteger x
-    then if toInteger x <= toInteger max
-        then fromIntegral x
-        else error$ printf "Overflow in argument to %s (0x%x > 0x%x) at 0x%x" name (toInteger x) (toInteger max) (toInteger pos)
-    else error$ printf "Overflow in argument to %s (0x%x < 0x%x) at 0x%x" name (toInteger x) (toInteger min) (toInteger pos)
-
-enforce_no_overflow :: (Integral a, Integral b, Bounded b, Integral ctr) => String -> ctr -> a -> b
-enforce_no_overflow = enforce_no_overflow' minBound maxBound
 
 startof x = do
     start <- here

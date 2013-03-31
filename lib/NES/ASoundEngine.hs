@@ -25,8 +25,8 @@ validate engine cont = if size engine == engine_size
     then cont
     else error$ printf "Sound engine was given an allocation of the wrong size (0x%x /= 0x%x)" (toInteger (size engine)) (toInteger engine_size)
 
-init :: Section6502 a -> ASM6502 ()
-init engine = validate engine $ mdo
+init :: Section6502 a -> ASM6502 (Section6502 ())
+init engine = validate engine $ area "NES.ASoundEngine.init" $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
          -- We're assuming memory has been zeroed out.
@@ -35,14 +35,14 @@ init engine = validate engine $ mdo
     init_part NES.pulse2
     init_part NES.triangle
 
-set_stream engine chn stream = validate engine $ do
+set_stream engine chn stream = validate engine $ area "NES.ASoundEngine.set_stream" $ mdo
     ldai (low stream)
     sta (engine_position engine + chn)
     ldai (high stream)
     sta (engine_position engine + chn + 1)
 
-run :: Section6502 a -> Section6502 b -> ASM6502 ()
-run engine note_table = mdo
+run :: Section6502 a -> Section6502 b -> ASM6502 (Section6502 ())
+run engine note_table = area "NES.ASoundEngine.run" $ mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.
     let position = engine_position engine
