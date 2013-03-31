@@ -29,20 +29,16 @@ main = do
      -- Only valid during drawing phase.
     let sprites_left = 0x0f
      -- Vectors are stored in x,y order
-    let xcoord = 0x00
-    let ycoord = 0x01
+    let xc = (+ 0x00)
+    let yc = (+ 0x01)
      -- Let's have a ball that's moved by the arrow keys.
      -- That's original, right?
-    ball_y <- resz 1
-    ball_x <- resz 1
-    camera_y <- resz 1
-    camera_x <- resz 1
-    screen_y <- resz 1
-    screen_x <- resz 1
+    ball <- resz 2
+    camera <- resz 2
+    screen <- resz 2
     save_ppuctrl <- res 1
     input2 <- res 1
     input1 <- res 1
-    trace (printf "0x%x" (start save_ppuctrl)) nothing
 
      -- UTILITY VALUES
 
@@ -52,8 +48,8 @@ main = do
 
     let init_ball = sect "init_ball" $ mdo
         ldai 0x80
-        sta ball_x
-        sta ball_y
+        sta (xc ball)
+        sta (yc ball)
 
     let move_ball = sect "move_ball" $ mdo
         let bump GT = inc
@@ -62,48 +58,42 @@ main = do
             unbump LT = inc
             branch GT = bcc
             branch LT = bcs 
-            move bit coord dir thr move_camera = mdo
+            move bit coord dir thr flipper = mdo
                 lda input1
                 andi bit
                 skip beq $ do
-                    bump dir (ball_x + coord)
-                    lda (ball_x + coord)
-                    sub (camera_x + coord)
+                    bump dir (coord ball)
+                    lda (coord ball)
+                    sub (coord camera)
                     cmpi thr
-                    skip (branch dir) move_camera
-        move btn_left xcoord LT 0x40 $ do
-            dec camera_x
-            dec screen_x
-            skip (lda screen_x >> cmpi 0xff >>. bne) $ do
+                    skip (branch dir) $ do
+                        bump dir (coord camera)
+                        bump dir (coord screen)
+                        flipper
+        move btn_left xc LT 0x40 $ do
+            skip (lda (xc screen) >> cmpi 0xff >>. bne) $ do
                 NES.nametable_x_bit -^>* save_ppuctrl
-        move btn_right xcoord GT 0xc1 $ do
-            inc camera_x
-            inc screen_x
+        move btn_right xc GT 0xc1 $ do
             skip bne $ do
                 NES.nametable_x_bit -^>* save_ppuctrl
-        move btn_up ycoord LT 0x40 $ do
-            dec camera_y
-            dec screen_y
-            skip (lda screen_y >> cmpi 0xff >>. bne) $ do
-                0xef ->* screen_y
+        move btn_up yc LT 0x40 $ do
+            skip (lda (yc screen) >> cmpi 0xff >>. bne) $ do
+                0xef ->* (yc screen)
                 NES.nametable_y_bit -^>* save_ppuctrl
-        move btn_down ycoord GT 0xb1 $ do
-            inc camera_y
-            inc screen_y
-            skip (lda screen_y >> cmpi 0xf0 >>. bne) $ do
-                0x00 ->* screen_y
+        move btn_down yc GT 0xb1 $ do
+            skip (lda (yc screen) >> cmpi 0xf0 >>. bne) $ do
+                0x00 ->* (yc screen)
                 NES.nametable_y_bit -^>* save_ppuctrl
 
      -- draw_model : Y = model size in bytes, 00:01 = pointer to model, 02 = xcoord, 03 = ycoord
     draw_model <- sect "draw_model_sub" $ do
         let modelp = 0x00
-            xcoord = 0x02
-            ycoord = 0x03
+            offset = 0x02
         dey
         rep bpl $ do
             ldayp modelp
-            add ycoord
-            sub camera_y
+            add (yc offset)
+            sub (yc camera)
             sta NES.oamdata
             dey
             ldayp modelp
@@ -113,8 +103,8 @@ main = do
             sta NES.oamdata
             dey
             ldayp modelp
-            add xcoord
-            sub camera_x
+            add (xc offset)
+            sub (xc camera)
             sta NES.oamdata
             dec sprites_left
             dey
@@ -200,8 +190,8 @@ main = do
         move_ball
         low ball_model ->* 0x00
         high ball_model ->* 0x01
-        ball_x *->* 0x02
-        ball_y *->* 0x03
+        (xc ball) *->* 0x02
+        (yc ball) *->* 0x03
         ldyi (size ball_model)
         jsr draw_model
          -- Stow away any unused sprites
@@ -214,8 +204,8 @@ main = do
          -- Set the bg scroll
         save_ppuctrl *->* NES.ppuctrl
         lda NES.ppustatus
-        screen_x *->* NES.ppuscroll
-        screen_y *->* NES.ppuscroll
+        (xc screen) *->* NES.ppuscroll
+        (yc screen) *->* NES.ppuscroll
         rti
 
     data_begin <- here
