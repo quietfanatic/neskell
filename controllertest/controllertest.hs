@@ -32,6 +32,7 @@ sprites_left = 0x0f
 
 ball_x : ball_y :
  camera_x : camera_y :
+ screen_x : screen_y :
  _ = [0x10..0xff] :: [Word8]
 
  -- MAIN MEMORY ALLOCATIONS
@@ -72,21 +73,25 @@ move_ball = mdo
 
     move btn_left xcoord LT 0x40 $ do
         dec camera_x
-        skip (lda camera_x >> cmpi 0xff >>. bne) $ do
+        dec screen_x
+        skip (lda screen_x >> cmpi 0xff >>. bne) $ do
             NES.nametable_x_bit -^>* save_ppuctrl
     move btn_right xcoord GT 0xc1 $ do
         inc camera_x
+        inc screen_x
         skip bne $ do
             NES.nametable_x_bit -^>* save_ppuctrl
     move btn_up ycoord LT 0x40 $ do
         dec camera_y
-        skip (lda camera_y >> cmpi 0xff >>. bne) $ do
-            0xef ->* camera_y
+        dec screen_y
+        skip (lda screen_y >> cmpi 0xff >>. bne) $ do
+            0xef ->* screen_y
             NES.nametable_y_bit -^>* save_ppuctrl
     move btn_down ycoord GT 0xb1 $ do
         inc camera_y
-        skip (lda camera_y >> cmpi 0xf0 >>. bne) $ do
-            0x00 ->* camera_y
+        inc screen_y
+        skip (lda screen_y >> cmpi 0xf0 >>. bne) $ do
+            0x00 ->* screen_y
             NES.nametable_y_bit -^>* save_ppuctrl
 
  -- draw_model_sub: Y = model size in bytes, 00:01 = pointer to model, 02 = xcoord, 03 = ycoord
@@ -213,8 +218,8 @@ nmi = asm reset $ mdo
      -- Set the bg scroll
     save_ppuctrl *->* NES.ppuctrl
     lda NES.ppustatus
-    camera_x *->* NES.ppuscroll
-    camera_y *->* NES.ppuscroll
+    screen_x *->* NES.ppuscroll
+    screen_y *->* NES.ppuscroll
     rti
 
     draw_model <- startof draw_model_sub
