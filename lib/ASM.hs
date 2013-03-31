@@ -27,7 +27,7 @@ import System.IO.Unsafe  -- for binfile
 type ASM ctr a = Assembler (S.Seq Word8) ctr a
 type ASMSection ctr a = Section (S.Seq Word8) ctr a
 
-asm :: Num ctr => ASMSection ctr a -> ASM ctr a -> ASMSection ctr a
+asm :: Num ctr => ASMSection ctr a -> ASM ctr b -> ASMSection ctr b
 asm = assemble
 
 asm_area :: Integral ctr => ASMSection ctr a -> String -> ASM ctr a -> ASMSection ctr a

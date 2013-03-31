@@ -27,7 +27,8 @@ workflow {
     subdep 'lib/ASM.hs', 'lib/Assembler.hs';
     subdep 'lib/ASM6502.hs', 'lib/ASM.hs';
     subdep 'lib/NES.hs', 'lib/ASM6502.hs';
-    subdep 'lib/NES/ASoundEngine.hs', 'lib/NES.hs';
+    subdep 'lib/NES/Reservations.hs', 'lib/NES.hs';
+    subdep 'lib/NES/ASoundEngine.hs', 'lib/NES/Reservations.hs';
     subdep doths('soundtest'), 'lib/NES/ASoundEngine.hs';
     subdep doths('controllertest'), 'lib/NES.hs';
     module 'soundtest';

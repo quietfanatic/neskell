@@ -2,31 +2,39 @@
 {-# LANGUAGE RecursiveDo, DeriveDataTypeable #-}
 
  -- Please import this qualified.
-module NES.ASoundEngine where
+module NES.ASoundEngine (
+    ASoundEngine, a_sound_engine, initialize, set_stream, run,
+    note, delay, loop, repeat, set_env, call
+) where
 
+import Prelude hiding (repeat)
 import Data.Word
 import Data.Typeable
 import Assembler
 import ASM
 import ASM6502
-import NES
+import NES hiding (initialize)
+import NES.Reservations
 import Text.Printf
 
-engine_size = 0x20 :: Word16
-
+data ASoundEngine = ASoundEngine (Section6502 ()) (Section6502 ())
+engine_note_table (ASoundEngine x _) = x
+engine_state (ASoundEngine _ x) = x
  -- Data is laid out in fours to match the NES channels
  -- 11112222ttttnnnn11--22--tt--nn--
-engine_position engine = start engine + 0x00
-engine_timer engine = start engine + 0x02
-engine_reps engine = start engine + 0x10  -- Takes up two slots
+engine_position = (+ 0x00) . section_start . engine_state
+engine_timer = (+ 0x02) . section_start . engine_state
+engine_reps = (+ 0x10) . section_start . engine_state  -- Takes up two slots for two loop units
+engine_size = 0x20 :: Word16
 
-validate :: Section6502 a -> b -> b
-validate engine cont = if size engine == engine_size
-    then cont
-    else error$ printf "Sound engine was given an allocation of the wrong size (0x%x /= 0x%x)" (toInteger (size engine)) (toInteger engine_size)
+ -- Takes a note table as input.
+a_sound_engine :: Section6502 () -> ASM6502 ASoundEngine
+a_sound_engine note_table = do
+    state <- res engine_size
+    return $ ASoundEngine note_table state
 
-init :: Section6502 a -> ASM6502 (Section6502 ())
-init engine = validate engine $ area "NES.ASoundEngine.init" $ mdo
+initialize :: ASoundEngine -> ASM6502 (Section6502 ())
+initialize engine = area "NES.ASoundEngine.init" $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
          -- We're assuming memory has been zeroed out.
@@ -35,17 +43,18 @@ init engine = validate engine $ area "NES.ASoundEngine.init" $ mdo
     init_part NES.pulse2
     init_part NES.triangle
 
-set_stream engine chn stream = validate engine $ area "NES.ASoundEngine.set_stream" $ mdo
+set_stream engine chn stream = area "NES.ASoundEngine.set_stream" $ mdo
     ldai (low stream)
     sta (engine_position engine + chn)
     ldai (high stream)
     sta (engine_position engine + chn + 1)
 
-run :: Section6502 a -> Section6502 b -> ASM6502 (Section6502 ())
-run engine note_table = area "NES.ASoundEngine.run" $ mdo
+run :: ASoundEngine -> ASM6502 (Section6502 ())
+run engine = area "NES.ASoundEngine.run" $ mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.
-    let position = engine_position engine
+    let note_table = engine_note_table engine
+        position = engine_position engine
         timer = engine_timer engine
         reps = engine_reps engine
         pos = 0x00  -- 0x00 stays 0 (the real pointer is y:0x01)

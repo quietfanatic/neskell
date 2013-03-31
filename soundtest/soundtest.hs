@@ -16,11 +16,13 @@ main = do
     B.putStr $ asm_result prgbank
 
 [bg_color] = allocate8 0x10 [1]
-[sound] = allocate16 0x300 [S.engine_size]
 
 prgbank_start = asm 0xc000 nothing
 
-reset = asm prgbank_start $ mdo
+ase = asm prgbank_start (S.a_sound_engine note_table)
+sound = section_return ase
+
+reset = asm ase $ mdo
     NES.initialize
 
      -- Set background color
@@ -37,7 +39,7 @@ reset = asm prgbank_start $ mdo
     NES.apumode *<- NES.sequencer_mode_bit .|. NES.disable_frame_irq_bit
 
 
-    S.init sound
+    S.initialize sound
     S.set_stream sound NES.pulse1 pulse1_stream2
     S.set_stream sound NES.pulse2 pulse2_stream2
     S.set_stream sound NES.triangle triangle_stream2
@@ -49,7 +51,7 @@ nmi = asm reset $ mdo
     NES.set_ppuaddr 0x3f00
     start bg_color *->* NES.ppudata
 
-    S.run sound note_table
+    S.run sound
 
     rti
 
