@@ -6,7 +6,8 @@ module Assembler (
     start, size, end,
     Assembler(..), assembler_function, assemble, allocate, allocate1,
     section, nothing, here, unit_assembler,
-    pad_assembler, return_assembler, fail_assembler, append_assembler, bind_assembler,
+    pad_assembler, return_assembler, append_assembler, bind_assembler,
+    fail_assembler, fail_assembler_if, generate_fail_message,
     enforce_counter, provide, trace_counter,
     get_annotation, get_annotation_default, set_annotation,
     area, assemble_area, get_area, appendable_area_name, current_area,
@@ -115,6 +116,12 @@ fail_assembler_if cond mess = Assembler f where
     f (ann, pos) = let
         err = error$ printf "%s%s at 0x%x" mess (appendable_area_name ann) (toInteger pos)
         in (ann, pos, if cond then err else mempty, ())
+
+generate_fail_message :: (Monoid mon, Integral ctr) => String -> Assembler mon ctr String
+generate_fail_message mess = Assembler f where
+    f (ann, pos) = let
+        message = printf "%s%s at 0x%x" mess (appendable_area_name ann) (toInteger pos)
+        in (ann, pos, mempty, message)
 
 append_assembler :: Monoid mon => Assembler mon ctr a -> Assembler mon ctr b -> Assembler mon ctr b
 append_assembler (Assembler left) (Assembler right) = Assembler f where
