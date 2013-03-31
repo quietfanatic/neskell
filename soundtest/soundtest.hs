@@ -16,12 +16,12 @@ main = do
     B.putStr $ asm_result prgbank
 
 
-prgbank = asm 0xc000 $ mdo
+(_, prgbank) = asm 0xc000 $ mdo
     let [bg_color] = allocate8 0x10 [1]
 
     sound <- S.a_sound_engine note_table
 
-    reset <- area "reset" $ mdo
+    reset <- sect "reset" $ mdo
         NES.initialize
 
          -- Set background color
@@ -46,7 +46,7 @@ prgbank = asm 0xc000 $ mdo
         idle <- here
         jmp idle
 
-    nmi <- area "nmi" $ mdo
+    nmi <- sect "nmi" $ mdo
         NES.set_ppuaddr 0x3f00
         start bg_color *->* NES.ppudata
 
@@ -54,16 +54,16 @@ prgbank = asm 0xc000 $ mdo
 
         rti
 
-    set_bg_blue <- area "set_bg_blue" $ mdo
+    set_bg_blue <- sect "set_bg_blue" $ mdo
         0x02 ->* start bg_color
         rts
-    set_bg_orange <- area "set_bg_orange" $ mdo
+    set_bg_orange <- sect "set_bg_orange" $ mdo
         0x08 ->* start bg_color
         rts
 
      -- this was initially copypasted from http://www.nintendoage.com/forum/messageview.cfm?catid=22&threadid=22776
      -- but a couple tweaks may have been made to sharpen notes up a little
-    note_table <- area "note_table" $ mapM_ le16 ([                     0x0000, 0x07f1, 0x0780, 0x0713, -- a1-b1 (0x01-0x03)
+    note_table <- sect "note_table" $ mapM_ le16 ([                     0x0000, 0x07f1, 0x0780, 0x0713, -- a1-b1 (0x01-0x03)
         0x06ad, 0x064d, 0x05f3, 0x059d, 0x054d, 0x0500, 0x04b8, 0x0475, 0x0435, 0x03f8, 0x03bf, 0x0389, -- c2-b2 (0x04-0x0f)
         0x0356, 0x0326, 0x02f9, 0x02ce, 0x02a6, 0x027f, 0x025c, 0x023a, 0x021a, 0x01fb, 0x01df, 0x01c4, -- c3-b3 (0x10-0x1b)
         0x01ab, 0x0193, 0x017c, 0x0167, 0x0151, 0x013f, 0x012d, 0x011c, 0x010c, 0x00fd, 0x00ef, 0x00e1, -- c4-b4 (0x1c-0x27)
@@ -73,20 +73,20 @@ prgbank = asm 0xc000 $ mdo
         0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4c-0x57)
         0x000c, 0x000c, 0x000b, 0x000a, 0x000a, 0x0009, 0x0008] :: [Word16])                            -- c9-f#9 (0x58-0x5e)
 
-    pulse1_stream1 <- area "pulse1_stream1" $ do
+    pulse1_stream1 <- sect "pulse1_stream1" $ do
         S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x8)
         S.call set_bg_blue
         S.repeat $ do
             hexdata "2040 2240 2340 2740 2540 2320 2220 201c 0004 2010 1e10 1b34 000c"
             hexdata "2040 2340 2240 1e40 2054 000c 2720 2564 001c"
 
-    pulse2_stream1 <- area "pulse2_stream1" $ do
+    pulse2_stream1 <- sect "pulse2_stream1" $ do
         S.set_env (NES.duty_quarter .|. NES.disable_length_counter .|. NES.constant_volume .|. 0x6)
         S.repeat $ do
             hexdata "1480 1280 1040 1240 1480"
             hexdata "1080 1280 1480 1280"
 
-    pulse1_stream2 <- area "pulse1_stream2" $ do
+    pulse1_stream2 <- sect "pulse1_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.call set_bg_orange
         S.repeat $ do
@@ -95,14 +95,14 @@ prgbank = asm 0xc000 $ mdo
                 hexdata "3714 0004 3414 0004"
             S.loop 4 $ do
                 hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
-    pulse2_stream2 <- area "pulse2_stream2" $ do
+    pulse2_stream2 <- sect "pulse2_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.repeat $ do
             S.loop 2 $ do
                 hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
             S.loop 4 $ do
                 hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
-    triangle_stream2 <- area "triangle_stream2" $ do
+    triangle_stream2 <- sect "triangle_stream2" $ do
         S.set_env 0x81
         S.repeat $ do
             hexdata "00c0 00c0"

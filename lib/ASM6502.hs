@@ -12,8 +12,8 @@ import ASM
 import Text.Printf
 
 type ASM6502 a = ASM Word16 a
-type Section6502 a = ASMSection Word16 a
-type ASM6502Section a = ASMSection Word16 a
+type Section6502 a = Section Word16 a
+type ASMblage6502 = ASMblage Word16
 
 low :: Integral a => a -> Word8
 low = fromIntegral
@@ -26,7 +26,7 @@ op8 name a x = byte a >> Assembler f where
         res = case no_overflow x :: Maybe Word8 of
             Just w8 -> S.singleton w8
             Nothing -> error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x)"
-                                     (appendable_area_name ann) name (toInteger pos) (toInteger x)
+                                     name (appendable_section_name ann) (toInteger pos) (toInteger x)
         in (ann, pos + 1, res, ())
 
 op16 :: Integral x => String -> Word8 -> x -> ASM6502 ()
@@ -37,7 +37,7 @@ op16 name a x = byte a >> Assembler f where
             Nothing -> case no_overflow x :: Maybe Word16 of
                 Just w16 -> w16
                 Nothing -> error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x)"
-                                         (appendable_area_name ann) name (toInteger pos) (toInteger x)
+                                         name (appendable_section_name ann) (toInteger pos) (toInteger x)
         res = S.singleton (fromIntegral res16) S.>< S.singleton (fromIntegral (B.shiftR res16 8))
         in (ann, pos + 2, res, ())
 
@@ -63,7 +63,7 @@ op8or16' max name a b x = case toInteger max of
             Just w16 -> byte b >> le16 w16
             Nothing -> Assembler f where
                 f (ann, pos) = error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x)"
-                                             (appendable_area_name ann) name (toInteger pos) (toInteger x)
+                                             name (appendable_section_name ann) (toInteger pos) (toInteger x)
 
  -- HACK HACK HACK
 instance Bounded Integer where
@@ -78,7 +78,7 @@ rel8 name b x = byte b >> Assembler f where
         res = case no_overflow off :: Maybe Int8 of
             Just i8 -> S.singleton (fromIntegral i8)
             Nothing -> fail$ printf "Branch target is too far away in %s%s at 0x%x (0x%x)"
-                                    (appendable_area_name ann) name (toInteger pos) (toInteger off)
+                                    name (appendable_section_name ann) (toInteger pos) (toInteger off)
         in (ann, pos + 1, res, ())
 
 adci :: Integral a => a -> ASM6502 ()

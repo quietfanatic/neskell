@@ -12,7 +12,7 @@ import Text.Printf
 
 newtype ResCounter a = ResCounter a deriving (Typeable)
 
-res_generic :: (Typeable a, Integral a, Integral b) => String -> a -> a -> b -> ASM6502 (ASMSection a ())
+res_generic :: (Typeable a, Integral a, Integral b) => String -> a -> a -> b -> ASM6502 (Section a ())
 res_generic space_name space_start space_end size = do
     rescounter <- get_annotation
     errmess <- generate_fail_message (printf "Not enough %s space left to reserve 0x%x bytes" space_name (toInteger size))
@@ -26,9 +26,9 @@ res_generic space_name space_start space_end size = do
     set_annotation (Just (ResCounter alloc_start))
     return ret
 
-res :: Integral a => a -> ASM6502 (ASMSection Word16 ())
+res :: Integral a => a -> ASM6502 (Section Word16 ())
 res = res_generic "main memory" 0x300 0x800
-resz :: Integral a => a -> ASM6502 (ASMSection Word8 ())
+resz :: Integral a => a -> ASM6502 (Section Word8 ())
 resz = res_generic "zero page" 0x10 0x00
 
 

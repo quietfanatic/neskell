@@ -22,7 +22,7 @@ main = do
     B.putStr $ background
     B.putStr $ B.replicate (0x1000 - B.length background) 0xff
 
-prgbank = asm 0xc000 $ mdo
+(_, prgbank) = asm 0xc000 $ mdo
 
      -- Keeps track of how many sprites have been drawn so far.
      -- Only valid during drawing phase.
@@ -46,12 +46,12 @@ prgbank = asm 0xc000 $ mdo
     let xcoord = 0x00
     let ycoord = 0x01
 
-    let init_ball = area "init_ball" $ mdo
+    let init_ball = sect "init_ball" $ mdo
         ldai 0x80
         sta ball_x
         sta ball_y
 
-    let move_ball = area "move_ball" $ mdo
+    let move_ball = sect "move_ball" $ mdo
         let bump GT = inc
             bump LT = dec
             unbump GT = dec
@@ -91,7 +91,7 @@ prgbank = asm 0xc000 $ mdo
                 NES.nametable_y_bit -^>* save_ppuctrl
 
      -- draw_model : Y = model size in bytes, 00:01 = pointer to model, 02 = xcoord, 03 = ycoord
-    draw_model <- area "draw_model_sub" $ do
+    draw_model <- sect "draw_model_sub" $ do
         let modelp = 0x00
             xcoord = 0x02
             ycoord = 0x03
@@ -116,7 +116,7 @@ prgbank = asm 0xc000 $ mdo
             dey
         rts
 
-    let read_controllers = area "read_controllers" $ mdo
+    let read_controllers = sect "read_controllers" $ mdo
          -- Freeze controllers for polling
         0x01 ->* NES.controller1
         0x00 ->* NES.controller1
@@ -128,7 +128,7 @@ prgbank = asm 0xc000 $ mdo
         read NES.controller1 input1
         read NES.controller2 input2
 
-    reset <- area "reset" $ mdo
+    reset <- sect "reset" $ mdo
         NES.initialize
          -- Load all the palettes
         NES.set_ppuaddr 0x3f00
@@ -174,7 +174,7 @@ prgbank = asm 0xc000 $ mdo
         idle <- here
         jmp idle
 
-    nmi <- area "nmi" $ mdo
+    nmi <- sect "nmi" $ mdo
         read_controllers
          -- Start sprite memory transfer
         0x00 ->* NES.oamaddr
@@ -214,7 +214,7 @@ prgbank = asm 0xc000 $ mdo
         screen_y *->* NES.ppuscroll
         rti
 
-    data_begin <- section nothing
+    data_begin <- here
      -- Use allocate and provide to ensure sizes are correct
     let [sprite_palettes, background_palettes, ball_model, btnspr_x, btnspr_y, btnspr_tile, btnspr_attr,
          tiles_tl, tiles_tr, tiles_bl, tiles_br, background] = allocate16 data_begin

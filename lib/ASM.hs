@@ -2,11 +2,11 @@
 {-# LANGUAGE RecursiveDo #-}
 
 module ASM (
-    ASM, ASMSection,
+    ASM, ASMblage, asm, asm_result,
     byte, bytes, ascii, bytestring, binfile, fill, fillto, pad, hex, hexdata,
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here,
-    asm, asm_area, asm_result, no_overflow,
+    no_overflow,
     startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
     allocate8, allocate16, allocate32, allocate64
@@ -25,16 +25,13 @@ import Unsafe.Coerce  -- for serializing floats and doubles
 import System.IO.Unsafe  -- for binfile
 
 type ASM ctr a = Assembler (S.Seq Word8) ctr a
-type ASMSection ctr a = Section (S.Seq Word8) ctr a
+type ASMblage ctr = Assemblage (S.Seq Word8) ctr
 
-asm :: Num ctr => ASMSection ctr a -> ASM ctr b -> ASMSection ctr b
+asm :: Num ctr => ASMblage ctr -> ASM ctr b -> (b, ASMblage ctr)
 asm = assemble
 
-asm_area :: Integral ctr => ASMSection ctr a -> String -> ASM ctr a -> ASMSection ctr a
-asm_area = assemble_area
-
-asm_result :: ASMSection ctr a -> B.ByteString
-asm_result = B.pack . F.toList . section_result
+asm_result :: ASMblage ctr -> B.ByteString
+asm_result = B.pack . F.toList . assemblage_result
 
 byte :: Num ctr => Word8 -> ASM ctr ()
 byte = unit_assembler . S.singleton
@@ -60,14 +57,14 @@ fill size b = Assembler f where
         then (ann, pos + size, S.replicate (fromIntegral size) b, ())
         else (ann, pos + size, err ann pos, ())
     err ann pos = error$ printf "Tried to fill a block with negative size%s at 0x%x (did something assemble too large?)"
-                                (appendable_area_name ann) (toInteger pos)
+                                (appendable_section_name ann) (toInteger pos)
 
 fillto :: Integral ctr => ctr -> Word8 -> ASM ctr ()
 fillto target b = Assembler f where
     f (ann, pos) = let
         payload = if target - pos < 0  -- allow target to be 0 on unsigned types for instance
             then error$ printf "fillto was called too late%s at 0x%x (did something assemble too large?)"
-                               (appendable_area_name ann) (toInteger pos)
+                               (appendable_section_name ann) (toInteger pos)
             else S.replicate (fromIntegral (target - pos)) b
         in (ann, target, payload, ())
 
@@ -174,15 +171,15 @@ skip branch code = mdo
 infixl 1 >>. 
 cmp >>. branch = (cmp >>) . branch
 
-allocate8 :: Integral siz => ASMSection Word8 a -> [siz] -> [ASMSection Word8 b]
+allocate8 :: Integral siz => Word8 -> [siz] -> [Section Word8 ()]
 allocate8 = allocate
 
-allocate16 :: Integral siz => ASMSection Word16 a -> [siz] -> [ASMSection Word16 b]
+allocate16 :: Integral siz => Word16 -> [siz] -> [Section Word16 ()]
 allocate16 = allocate
 
-allocate32 :: Integral siz => ASMSection Word32 a -> [siz] -> [ASMSection Word32 b]
+allocate32 :: Integral siz => Word32 -> [siz] -> [Section Word32 ()]
 allocate32 = allocate
 
-allocate64 :: Integral siz => ASMSection Word64 a -> [siz] -> [ASMSection Word64 b]
+allocate64 :: Integral siz => Word64 -> [siz] -> [Section Word64 ()]
 allocate64 = allocate
 

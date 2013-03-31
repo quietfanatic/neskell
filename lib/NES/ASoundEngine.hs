@@ -34,7 +34,7 @@ a_sound_engine note_table = do
     return $ ASoundEngine note_table state
 
 initialize :: ASoundEngine -> ASM6502 (Section6502 ())
-initialize engine = area "NES.ASoundEngine.init" $ mdo
+initialize engine = sect "NES.ASoundEngine.initialize" $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
          -- We're assuming memory has been zeroed out.
@@ -43,14 +43,14 @@ initialize engine = area "NES.ASoundEngine.init" $ mdo
     init_part NES.pulse2
     init_part NES.triangle
 
-set_stream engine chn stream = area "NES.ASoundEngine.set_stream" $ mdo
+set_stream engine chn stream = sect "NES.ASoundEngine.set_stream" $ mdo
     ldai (low stream)
     sta (engine_position engine + chn)
     ldai (high stream)
     sta (engine_position engine + chn + 1)
 
 run :: ASoundEngine -> ASM6502 (Section6502 ())
-run engine = area "NES.ASoundEngine.run" $ mdo
+run engine = sect "NES.ASoundEngine.run" $ mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.
     let note_table = engine_note_table engine
