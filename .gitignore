@@ -2,4 +2,5 @@
 *.o
 *.exe
 *.nes
-*.deb  # fceux debug files
+ # fceux debug files
+*.deb
