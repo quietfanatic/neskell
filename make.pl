@@ -30,7 +30,7 @@ workflow {
     subdep 'lib/NES/Reservations.hs', 'lib/NES.hs';
     subdep 'lib/NES/ASoundEngine.hs', 'lib/NES/Reservations.hs';
     subdep doths('soundtest'), 'lib/NES/ASoundEngine.hs';
-    subdep doths('controllertest'), 'lib/NES.hs';
+    subdep doths('controllertest'), [qw(lib/NES.hs lib/NES/Reservations.hs)];
     module 'soundtest';
     module 'controllertest';
 
