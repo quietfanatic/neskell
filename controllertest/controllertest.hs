@@ -6,11 +6,12 @@ import Assembler
 import ASM
 import ASM6502
 import qualified NES
+import NES.Reservations
 import Data.Word
 import Data.Bits ((.|.), shiftL)
 import Data.Monoid
 import Debug.Trace
-
+import Text.Printf
 
 main = do
     B.putStr $ NES.header 0x01 0x01 0x00 0x00
@@ -27,24 +28,27 @@ main = do
      -- Keeps track of how many sprites have been drawn so far.
      -- Only valid during drawing phase.
     let sprites_left = 0x0f
-     -- ZERO PAGE ALLOCATIONS
+     -- Vectors are stored in x,y order
+    let xcoord = 0x00
+    let ycoord = 0x01
      -- Let's have a ball that's moved by the arrow keys.
      -- That's original, right?
-    let ball_x : ball_y :
-         camera_x : camera_y :
-         screen_x : screen_y :
-         _ = [0x10..0xff] :: [Word8]
-     -- MAIN MEMORY ALLOCATIONS
-    let save_ppuctrl : input1 : input2 : _ = [0x0300..0x0800] :: [Word16]
+    ball_y <- resz 1
+    ball_x <- resz 1
+    camera_y <- resz 1
+    camera_x <- resz 1
+    screen_y <- resz 1
+    screen_x <- resz 1
+    save_ppuctrl <- res 1
+    input2 <- res 1
+    input1 <- res 1
+    trace (printf "0x%x" (start save_ppuctrl)) nothing
 
      -- UTILITY VALUES
 
     let btn_right : btn_left : btn_down : btn_up :
          btn_start : btn_select : btn_b : btn_a :
          _ = map (shiftL 1) [0..] :: [Word8]
-
-    let xcoord = 0x00
-    let ycoord = 0x01
 
     let init_ball = sect "init_ball" $ mdo
         ldai 0x80
