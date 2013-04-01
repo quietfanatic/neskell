@@ -74,7 +74,7 @@ run' engine = sect "NES.ASoundEngine.run" $ mdo
         read_commands <- mdo
             ldyx position
             sta (pos + 1)
-            read_commands <- section$ mdo
+            read_commands <- sect "read_commands" $ mdo
                 ldayp pos
                 next
                 sty tmpy
@@ -115,38 +115,36 @@ run' engine = sect "NES.ASoundEngine.run" $ mdo
         le16 command_delay
         le16 command_set_env
         le16 command_call
-        command_loopb <- section$ mdo
-            stx tmpy
-            inx
-            jmp command_loop_start
+        command_loopb <- here
+        stx tmpy
+        inx
+        jmp command_loop_start
         command_loopa <- here
-        command_loop_start <- mdo
-            stx tmpy
-            command_loop_start <- here
-            ldax reps
-            skip bne$ mdo
-                ldayp pos  -- reps is zero; start loop
-                skip bne $ mdo
-                    next  -- If the program says zero reps it means infinite
-                    jmp do_goto
-                stax reps
-            next
-            decx reps
+        stx tmpy
+        command_loop_start <- here
+        ldax reps
+        skip bne$ mdo
+            ldayp pos  -- reps is zero; start loop
             skip bne $ mdo
-                next
-                next
-                ldx tmpy
-                jmp read_commands
-            do_goto <- section$ mdo
-                ldx tmpy
-                ldayp pos  -- reps is non-zero or loop is infinite
-                sta tmpy
-                next
-                ldayp pos
-                sta (pos + 1)
-                ldy tmpy
-                jmp read_commands
-            return command_loop_start
+                next  -- If the program says zero reps it means infinite
+                jmp do_goto
+            stax reps
+        next
+        decx reps
+        skip bne $ mdo
+            next
+            next
+            ldx tmpy
+            jmp read_commands
+        do_goto <- section$ mdo
+            ldx tmpy
+            ldayp pos  -- reps is non-zero or loop is infinite
+            sta tmpy
+            next
+            ldayp pos
+            sta (pos + 1)
+            ldy tmpy
+            jmp read_commands
         command_delay <- section$ mdo
             ldayp pos >> stax timer
             next
@@ -192,9 +190,9 @@ loop :: Word8 -> ASM6502 () -> ASM6502 ()
 loop times code = do
     begin <- here
     LoopCount c <- get_annotation_default (LoopCount 0)
-    set_annotation (Just (LoopCount (c + 1)))
+    set_annotation (LoopCount (c + 1))
     code
-    set_annotation (Just (LoopCount c))
+    set_annotation (LoopCount c)
     byte (loop_code begin c)
     byte times
     le16 begin
