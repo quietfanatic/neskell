@@ -11,7 +11,7 @@ module Assembler (
     Annotations, annotations_get, get_all_annotations,
     get_annotation, get_annotation_typed, get_annotation_maybe, get_annotation_maybe_typed, get_annotation_default,
     set_annotation, clear_annotation, set_annotation_maybe,
-    modify_annotation, with_annotation,
+    modify_annotation, modify_annotation_default, with_annotation,
     Section(..), section_annotations, section_name, section_start, section_size, section_end, section_return,
     start, size, end,
     section, sect, allocate, allocate_named, allocate1, allocate1_named, provide,
@@ -209,20 +209,29 @@ get_annotation_default :: (Typeable a, Monoid mon) => a -> Assembler mon ctr a
 get_annotation_default def = Assembler f where
     f (ann, pos) = (ann, pos, mempty, fromMaybe def (annotations_get ann))
 
+ -- Modify an annotation in place.  If none exists, does nothing.
+modify_annotation :: (Typeable a, Monoid mon, Integral ctr) => (a -> a) -> Assembler mon ctr ()
+modify_annotation f = do
+    ann <- get_annotation_maybe
+    let result = case ann of
+            Just x -> Just (f x)
+            Nothing -> Nothing
+    set_annotation_maybe result
+
  -- Modify an annotation in place.  If the annotation hasn't been set, the given default value
- --  will be process with the given function instead of the current value.
-modify_annotation :: (Typeable a, Monoid mon, Integral ctr) => a -> (a -> a) -> Assembler mon ctr ()
-modify_annotation def f = do
+ --  will be processed with the given function instead of the current value.
+modify_annotation_default :: (Typeable a, Monoid mon, Integral ctr) => a -> (a -> a) -> Assembler mon ctr ()
+modify_annotation_default def f = do
     ann <- get_annotation_default def
-    set_annotation (Just (f ann))
+    set_annotation (f ann)
 
  -- Temporarily set an annotation and restore its previous value after the block is done
-with_annotation :: (Typeable a, Monoid mon, Integral ctr) => Maybe a -> Assembler mon ctr b -> Assembler mon ctr b
+with_annotation :: (Typeable a, Monoid mon, Integral ctr) => a -> Assembler mon ctr b -> Assembler mon ctr b
 with_annotation x inner = do
-    old <- get_annotation_typed (fromJust x)
+    old <- get_annotation_maybe_typed x
     set_annotation x
     ret <- inner
-    set_annotation old
+    set_annotation_maybe old
     return ret
 
  -- SECTIONS
@@ -283,7 +292,7 @@ sect name inner = mdo
             newname -> NamedSections (M.insertWith (++) newname [section_erase_types sect] map)
     old <- get_annotation_maybe
     set_annotation (CurrentSection (section_erase_types sect))
-    modify_annotation (NamedSections M.empty) add_named_section
+    modify_annotation_default (NamedSections M.empty) add_named_section
     start <- here
     ret <- inner
     end <- here

@@ -67,7 +67,7 @@ main = do
         0x06ad, 0x064d, 0x05f3, 0x059d, 0x054d, 0x0500, 0x04b8, 0x0475, 0x0435, 0x03f8, 0x03bf, 0x0389, -- c2-b2 (0x04-0x0f)
         0x0356, 0x0326, 0x02f9, 0x02ce, 0x02a6, 0x027f, 0x025c, 0x023a, 0x021a, 0x01fb, 0x01df, 0x01c4, -- c3-b3 (0x10-0x1b)
         0x01ab, 0x0193, 0x017c, 0x0167, 0x0151, 0x013f, 0x012d, 0x011c, 0x010c, 0x00fd, 0x00ef, 0x00e1, -- c4-b4 (0x1c-0x27)
-        0x00d2, 0x00c9, 0x00bd, 0x00b3, 0x00a9, 0x009f, 0x0096, 0x008e, 0x0086, 0x007e, 0x0077, 0x0070, -- c5-b5 (0x28-0x33)
+        0x00d4, 0x00c9, 0x00bd, 0x00b3, 0x00a9, 0x009f, 0x0096, 0x008e, 0x0086, 0x007e, 0x0077, 0x0070, -- c5-b5 (0x28-0x33)
         0x006a, 0x0064, 0x005e, 0x0059, 0x0054, 0x004f, 0x004b, 0x0046, 0x0042, 0x003f, 0x003b, 0x0038, -- c6-b6 (0x34-0x3f)
         0x0034, 0x0031, 0x002f, 0x002c, 0x0029, 0x0027, 0x0025, 0x0023, 0x0021, 0x001f, 0x001d, 0x001b, -- c7-b7 (0x40-0x4b)
         0x001a, 0x0018, 0x0017, 0x0015, 0x0014, 0x0013, 0x0012, 0x0011, 0x0010, 0x000f, 0x000e, 0x000d, -- c8-b8 (0x4c-0x57)
@@ -88,41 +88,45 @@ main = do
 
     let chime x = S.note x 0x14 >> S.note 0 0x04
     let volume x = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. NES.constant_volume .|. x :: Word8)
+    let measure = S.ensure_length 0xc0
     pulse1_stream2 <- sect "pulse1_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.call set_bg_orange
-        S.loop 2 $ do
+        S.loop 2 $ measure $ do
             S.loop 3 $ chime 0x38 >> chime 0x34
             chime 0x37 >> chime 0x34
         S.repeat $ do
-            S.loop 4 $ do
+            S.loop 8 $ measure $ do
                 mapM chime (hex "38 34 38 34 37 34 37 34")
-            S.loop 4 $ do
+            S.loop 8 $ measure $ do
                 mapM (flip S.note 0x0c) (hex "38 2f 34 2f 38 2f 34 2f 37 30 34 30 37 30 34 30")
     pulse2_stream2 <- sect "pulse2_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
-        S.loop 2 $ do
+        S.loop 2 $ measure $ do
             S.loop 3 $ chime 0x31 >> chime 0x2c
             chime 0x30 >> chime 0x2b
         S.repeat $ do
-            S.loop 4 $ mapM chime (hex "31 2c 31 2c 30 2b 30 2b")
-            volume 3  -- The order of the volume and the loop is on purpose.
-            S.loop 3 $ do
-                let cresc x = volume x >> S.delay 0x18
-                S.note 0x2c 0x18 >> cresc 3 >> cresc 4 >> cresc 5
-                volume 4 >> S.note 0x2b 0x24 >> volume 3 >> S.note 0x2a 0x24 >> volume 2 >> S.note 0x28 0x18
-            S.delay (0x30 * 4)
+            S.loop 8 $ measure $ mapM chime (hex "31 2c 31 2c 30 2b 30 2b")
+            volume 5  -- The order of the volume and the loop is on purpose.
+            S.loop 2 $ do
+                S.loop 3 $ measure $ do
+                    let cresc x = volume x >> S.delay 0x18
+                    S.note 0x2c 0x18 >> cresc 5 >> cresc 6 >> cresc 7
+                    volume 6 >> S.note 0x2b 0x24 >> volume 5 >> S.note 0x2a 0x24 >> volume 4 >> S.note 0x28 0x18
+                measure $ S.delay 0x18 >> volume 3 >> S.delay 0x48 >> volume 5 >> S.note 0x28 0x30 >> S.note 0x26 0x30
             S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     triangle_stream2 <- sect "triangle_stream2" $ do
         S.set_env 0x81
         S.delay 0x180
         S.repeat $ do
-            hexdata "0030 1412 1912 1c06 0006 1c24 1330 000c"
-            hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
-            hexdata "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
             S.loop 2 $ do
-                hexdata "1c30 2330 2430 2b1a 0016"
-            hexdata "1c30 2330 2430 2b30 2a30 2330 2130 2830"
+                hexdata "0030 1412 1912 1c06 0006 1c24 1330 000c"
+                hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
+                hexdata "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
+            S.loop 2 $ do
+                S.loop 2 $ do
+                    hexdata "1c30 2330 2430 2b1a 0016"
+                hexdata "1c30 2330 2430 2b30 2a30 2330 2130 2830"
 
     fillto 0xfffa 0xff
     provide NES.nmi $ le16 nmi

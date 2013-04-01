@@ -4,7 +4,7 @@
  -- Please import this qualified.
 module NES.ASoundEngine (
     ASoundEngine, a_sound_engine', initialize', set_stream', run',
-    note, delay, loop, repeat, set_env, call
+    note, delay, loop, repeat, set_env, call, ensure_length
 ) where
 
 import Prelude hiding (repeat)
@@ -167,10 +167,15 @@ run' engine = sect "NES.ASoundEngine.run" $ mdo
 
 loopa_code : loopb_code : delay_code : set_env_code : call_code : _ = [0x80..] :: [Word8]
 
+newtype LoopCount = LoopCount Int deriving (Typeable)
+newtype LengthCount = LengthCount Int deriving (Typeable)
+addlength x (LengthCount y) = LengthCount (fromIntegral x + y) 
+inflength (LengthCount _) = LengthCount (error "ensure_length failed; length became infinit due to a repeat.")
+
 delaybyte :: Integral a => a -> ASM6502 ()
 delaybyte d = if d <= 0xff
     then byte (fromIntegral d)
-    else byte 0xff >> delay (d - 0xff)
+    else byte 0xff >> delay' (d - 0xff)
 
 note :: (Integral a, Integral b) => a -> b -> ASM6502 ()
 note n d = do
@@ -178,11 +183,13 @@ note n d = do
     if n <= 0x7f
         then byte (fromIntegral n) >> delaybyte d
         else fail$ printf "Note value is too large (0x%x > 0x7f) at 0x%x" (toInteger n) pos
+    modify_annotation (addlength d)
+
+delay' :: Integral a => a -> ASM6502 ()
+delay' d = byte delay_code >> delaybyte d
 
 delay :: Integral a => a -> ASM6502 ()
-delay d = byte delay_code >> delaybyte d
-
-newtype LoopCount = LoopCount Int deriving (Typeable)
+delay d = delay' d >> modify_annotation (addlength d)
 
 loop_code spot 0 = loopa_code
 loop_code spot 1 = loopb_code
@@ -193,11 +200,18 @@ loop times code = do
     begin <- here
     LoopCount c <- get_annotation_default (LoopCount 0)
     set_annotation (LoopCount (c + 1))
+    startlen <- get_annotation_maybe
     code
+    endlen <- get_annotation_maybe
     set_annotation (LoopCount c)
     byte (loop_code begin c)
     byte times
     le16 begin
+    let finallen = case (startlen, endlen) of
+            (Just (LengthCount s), Just (LengthCount e)) -> Just (LengthCount (s + (e - s) * (fromIntegral times)))
+            _ -> Nothing
+    set_annotation_maybe finallen
+
 
 repeat :: ASM6502 a -> ASM6502 ()
 repeat code = do
@@ -206,9 +220,20 @@ repeat code = do
     byte loopa_code
     byte 0
     le16 begin
+    modify_annotation inflength
 
 set_env :: Word8 -> ASM6502 ()
 set_env val = byte set_env_code >> byte val
 
 call :: Integral a => a -> ASM6502 ()
 call = op16 "NES.ASoundEngine.call" call_code
+
+ensure_length :: Integral a => a -> ASM6502 b -> ASM6502 b
+ensure_length len inner = do
+    (ret, got) <- with_annotation (LengthCount 0) $ do
+        ret <- inner
+        LengthCount got <- get_annotation
+        return (ret, got)
+    fail_assembler_if (got /= fromIntegral len) (printf "ensure_length failed; expected length %d but got length %d."
+                                           (toInteger len) got)
+    return ret
