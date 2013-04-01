@@ -17,9 +17,9 @@ import Text.Printf
 
 palette :: PixelRGBA8 -> Int
 palette (PixelRGBA8 0 0 0 255) = 0
-palette (PixelRGBA8 90 90 90 255) = 0
-palette (PixelRGBA8 180 180 180 255) = 0
-palette (PixelRGBA8 255 255 255 255) = 0
+palette (PixelRGBA8 90 90 90 255) = 1
+palette (PixelRGBA8 180 180 180 255) = 2
+palette (PixelRGBA8 255 255 255 255) = 3
 palette (PixelRGBA8 r g b a) = error $ printf "Unrecognized pixel value: %u %u %u %u" r g b a
 
 main = do

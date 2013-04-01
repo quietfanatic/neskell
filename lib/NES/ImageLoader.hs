@@ -5,6 +5,7 @@ import Data.Word
 import qualified Data.ByteString as B
 import qualified Codec.Picture as P
 import qualified Codec.Picture.Types as PT
+import Debug.Trace
 
 bits_to_bytes :: [Bool] -> [Word8]
 bits_to_bytes [] = []
@@ -31,7 +32,7 @@ image_to_chr pal dynimg = let
     bitfields b = [[testBit i b | i <- is] | is <- indexblocks]
     bits = map (uncurry (++)) $ zip (bitfields 0) (bitfields 1)
     bytes = concatMap bits_to_bytes bits
-    in B.pack bytes
+    in trace (show (map (map (flip testBit 0)) indexblocks)) (B.pack bytes)
 
 e_image_to_chr pal (Left mess) = error mess
 e_image_to_chr pal (Right img) = image_to_chr pal img
