@@ -188,7 +188,7 @@ loop_code spot 0 = loopa_code
 loop_code spot 1 = loopb_code
 loop_code spot _ = error$ printf "Too many nested loops in music stream at 0x%x" spot
 
-loop :: Word8 -> ASM6502 () -> ASM6502 ()
+loop :: Word8 -> ASM6502 a -> ASM6502 ()
 loop times code = do
     begin <- here
     LoopCount c <- get_annotation_default (LoopCount 0)
@@ -199,7 +199,7 @@ loop times code = do
     byte times
     le16 begin
 
-repeat :: ASM6502 () -> ASM6502 ()
+repeat :: ASM6502 a -> ASM6502 ()
 repeat code = do
     begin <- here
     code

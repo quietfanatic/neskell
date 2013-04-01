@@ -86,34 +86,37 @@ main = do
             hexdata "1480 1280 1040 1240 1480"
             hexdata "1080 1280 1480 1280"
 
+    let chime x = S.note x 0x14 >> S.note 0 0x04
     pulse1_stream2 <- sect "pulse1_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.call set_bg_orange
         S.loop 2 $ do
-            S.loop 3 $ hexdata "3814 0004 3414 0004"
-            hexdata "3714 0004 3414 0004"
+            S.loop 3 $ chime 0x38 >> chime 0x34
+            chime 0x37 >> chime 0x34
         S.repeat $ do
             S.loop 4 $ do
-                hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
+                mapM chime (hex "38 34 38 34 37 34 37 34")
             S.loop 4 $ do
-                hexdata "380c 2f0c 340c 2f0c 380c 2f0c 340c 2f0c 370c 300c 340c 300c 370c 300c 340c 300c"
+                mapM (flip S.note 0x0c) (hex "38 2f 34 2f 38 2f 34 2f 37 30 34 30 37 30 34 30")
     pulse2_stream2 <- sect "pulse2_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.loop 2 $ do
-            hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
+            S.loop 3 $ chime 0x31 >> chime 0x2c
+            chime 0x30 >> chime 0x2b
         S.repeat $ do
             S.loop 4 $ do
-                hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
+                mapM chime (hex "31 2c 31 2c 30 2b 30 2b")
             let volume x = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. NES.constant_volume .|. x :: Word8)
             volume 3  -- The order of the volume and the loop is on purpose.
             S.loop 3 $ do
-                S.note 0x2c 0x18 >> volume 3 >> S.delay 0x18 >> volume 4 >> S.delay 0x18 >> volume 5 >> S.delay 0x18
+                let cresc x = volume x >> S.delay 0x18
+                S.note 0x2c 0x18 >> cresc 3 >> cresc 4 >> cresc 5
                 volume 4 >> S.note 0x2b 0x24 >> volume 3 >> S.note 0x2a 0x24 >> volume 2 >> S.note 0x28 0x18
             S.delay (0x30 * 4)
             S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     triangle_stream2 <- sect "triangle_stream2" $ do
         S.set_env 0x81
-        hexdata "00c0 00c0"
+        S.delay 0x180
         S.repeat $ do
             hexdata "0030 1412 1912 1c06 0006 1c24 1330 000c"
             hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
