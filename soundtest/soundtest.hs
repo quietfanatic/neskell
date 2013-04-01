@@ -89,26 +89,38 @@ main = do
     pulse1_stream2 <- sect "pulse1_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.call set_bg_orange
+        S.loop 2 $ do
+            S.loop 3 $ hexdata "3814 0004 3414 0004"
+            hexdata "3714 0004 3414 0004"
         S.repeat $ do
-            S.loop 2 $ do
-                S.loop 3 $ hexdata "3814 0004 3414 0004"
-                hexdata "3714 0004 3414 0004"
             S.loop 4 $ do
                 hexdata "3814 0004 3414 0004 3814 0004 3414 0004 3714 0004 3414 0004 3714 0004 3414 0004"
+            S.loop 4 $ do
+                hexdata "380c 2f0c 340c 2f0c 380c 2f0c 340c 2f0c 370c 300c 340c 300c 370c 300c 340c 300c"
     pulse2_stream2 <- sect "pulse2_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
+        S.loop 2 $ do
+            hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
         S.repeat $ do
-            S.loop 2 $ do
-                hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004"
             S.loop 4 $ do
                 hexdata "3114 0004 2c14 0004 3114 0004 2c14 0004 3014 0004 2b14 0004 3014 0004 2b14 0004"
+            let volume x = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. NES.constant_volume .|. x :: Word8)
+            volume 3  -- The order of the volume and the loop is on purpose.
+            S.loop 3 $ do
+                S.note 0x2c 0x18 >> volume 3 >> S.delay 0x18 >> volume 4 >> S.delay 0x18 >> volume 5 >> S.delay 0x18
+                volume 4 >> S.note 0x2b 0x24 >> volume 3 >> S.note 0x2a 0x24 >> volume 2 >> S.note 0x28 0x18
+            S.delay (0x30 * 4)
+            S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
     triangle_stream2 <- sect "triangle_stream2" $ do
         S.set_env 0x81
+        hexdata "00c0 00c0"
         S.repeat $ do
-            hexdata "00c0 00c0"
             hexdata "0030 1412 1912 1c06 0006 1c24 1330 000c"
             hexdata "0030 1412 1912 1c06 0006 1c24 1e04 1f04 1e04 1c24 000c"
             hexdata "0030 1412 1912 1c06 0006 1c24 1324 1506 0006 1430 009c"
+            S.loop 2 $ do
+                hexdata "1c30 2330 2430 2b1a 0016"
+            hexdata "1c30 2330 2430 2b30 2a30 2330 2130 2830"
 
     fillto 0xfffa 0xff
     provide NES.nmi $ le16 nmi

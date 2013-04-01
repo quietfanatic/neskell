@@ -167,17 +167,19 @@ run' engine = sect "NES.ASoundEngine.run" $ mdo
 
 loopa_code : loopb_code : delay_code : set_env_code : call_code : _ = [0x80..] :: [Word8]
 
+delaybyte :: Integral a => a -> ASM6502 ()
 delaybyte d = if d <= 0xff
     then byte (fromIntegral d)
     else byte 0xff >> delay (d - 0xff)
 
+note :: (Integral a, Integral b) => a -> b -> ASM6502 ()
 note n d = do
     pos <- here
     if n <= 0x7f
         then byte (fromIntegral n) >> delaybyte d
-        else fail$ printf "Note value is too large (0x%x > 0x7f) at 0x%x" n pos
+        else fail$ printf "Note value is too large (0x%x > 0x7f) at 0x%x" (toInteger n) pos
 
-delay :: Word8 -> ASM6502 ()
+delay :: Integral a => a -> ASM6502 ()
 delay d = byte delay_code >> delaybyte d
 
 newtype LoopCount = LoopCount Int deriving (Typeable)
