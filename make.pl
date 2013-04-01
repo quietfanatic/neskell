@@ -31,6 +31,7 @@ workflow {
     subdep 'lib/NES/ASoundEngine.hs', 'lib/NES/Reservations.hs';
     subdep doths('soundtest'), 'lib/NES/ASoundEngine.hs';
     subdep doths('controllertest'), [qw(lib/NES.hs lib/NES/Reservations.hs lib/NES/ImageLoader.hs)];
+    subdep dotexe('controllertest'), [qw(controllertest/sprites.png controllertest/background.bin)];
     module 'soundtest';
     module 'controllertest';
 
