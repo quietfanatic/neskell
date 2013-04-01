@@ -87,6 +87,7 @@ main = do
             hexdata "1080 1280 1480 1280"
 
     let chime x = S.note x 0x14 >> S.note 0 0x04
+    let volume x = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. NES.constant_volume .|. x :: Word8)
     pulse1_stream2 <- sect "pulse1_stream2" $ do
         S.set_env (NES.duty_half .|. NES.disable_length_counter .|. 0x3)
         S.call set_bg_orange
@@ -104,9 +105,7 @@ main = do
             S.loop 3 $ chime 0x31 >> chime 0x2c
             chime 0x30 >> chime 0x2b
         S.repeat $ do
-            S.loop 4 $ do
-                mapM chime (hex "31 2c 31 2c 30 2b 30 2b")
-            let volume x = S.set_env (NES.duty_half .|. NES.disable_length_counter .|. NES.constant_volume .|. x :: Word8)
+            S.loop 4 $ mapM chime (hex "31 2c 31 2c 30 2b 30 2b")
             volume 3  -- The order of the volume and the loop is on purpose.
             S.loop 3 $ do
                 let cresc x = volume x >> S.delay 0x18

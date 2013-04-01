@@ -9,7 +9,7 @@ module Assembler (
     append_assembler, bind_assembler, fix_assembler, pad_assembler,
     enforce_counter, trace_counter,
     Annotations, annotations_get, get_all_annotations,
-    get_annotation, get_annotation_typed, get_annotation_default,
+    get_annotation, get_annotation_typed, get_annotation_maybe, get_annotation_maybe_typed, get_annotation_default,
     set_annotation, clear_annotation, set_annotation_maybe,
     modify_annotation, with_annotation,
     Section(..), section_annotations, section_name, section_start, section_size, section_end, section_return,
@@ -182,13 +182,26 @@ set_annotation_maybe x = Assembler f where
         Nothing -> M.delete (typeOf (fromJust x)) ann
     f (ann, pos) = (ann2 ann, pos, mempty, ())
 
- -- Get Just an annotation or Nothing if it hasn't been set (or has been cleared)
-get_annotation :: (Typeable a, Monoid mon) => Assembler mon ctr (Maybe a)
+ -- Get an annotation, or error if there's no annotation of that type
+get_annotation :: (Typeable a, Monoid mon, Integral ctr) => Assembler mon ctr a
 get_annotation = get_annotation_typed undefined
 
- -- In case you need to specify the type of the annotation.
-get_annotation_typed :: (Typeable a, Monoid mon) => a -> Assembler mon ctr (Maybe a)
-get_annotation_typed whatever = Assembler f where
+ -- In case it's more convenient to manually specify the type of the annotation
+get_annotation_typed :: (Typeable a, Monoid mon, Integral ctr) => a -> Assembler mon ctr a
+get_annotation_typed _ = Assembler f where
+    f (ann, pos) = let
+        ret = case annotations_get ann of
+            Just x -> x
+            Nothing -> error$ printf "Tried to get non-existent annotation of type %s%s at 0x%x"
+                                     (appendable_section_name ann) (show (typeOf ret)) (toInteger pos)
+        in (ann, pos, mempty, ret)
+
+ -- Get Just an annotation or Nothing if there is none
+get_annotation_maybe :: (Typeable a, Monoid mon) => Assembler mon ctr (Maybe a)
+get_annotation_maybe = get_annotation_maybe_typed undefined
+
+get_annotation_maybe_typed :: (Typeable a, Monoid mon) => a -> Assembler mon ctr (Maybe a)
+get_annotation_maybe_typed _ = Assembler f where
     f (ann, pos) = (ann, pos, mempty, annotations_get ann)
 
  -- Get an annotation or a default value if it hasn't been set
@@ -268,7 +281,7 @@ sect name inner = mdo
         add_named_section (NamedSections map) = case newname of
             "" -> NamedSections map
             newname -> NamedSections (M.insertWith (++) newname [section_erase_types sect] map)
-    old <- get_annotation
+    old <- get_annotation_maybe
     set_annotation (CurrentSection (section_erase_types sect))
     modify_annotation (NamedSections M.empty) add_named_section
     start <- here
@@ -331,7 +344,7 @@ appendable_section_name ann = case annotations_get ann of
  -- Returns the section currently being processed.
 current_section :: (Monoid mon, Integral ctr) => Assembler mon ctr (Maybe (Section ctr Unknown))
 current_section = do
-    x <- get_annotation
+    x <- get_annotation_maybe
     let ret = case x of
             Just (CurrentSection sect) -> Just (section_recover_ctr_type sect)
             Nothing -> Nothing
