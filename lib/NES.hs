@@ -144,7 +144,7 @@ initialize_end = do
      -- wait for second vblank
     rep bpl (bitm ppustatus)
 
-initialize_custom_clear clear = initialize_begin >> clear >> initialize_end
+initialize_custom_clear clear = sect "NES.initialize" (initialize_begin >> clear >> initialize_end)
 initialize = initialize_custom_clear clear_memory
 
 read_input_to :: (Integral a, Bounded a) => a -> ASM6502 (Section6502 ())
