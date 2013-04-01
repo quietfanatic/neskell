@@ -3,7 +3,7 @@
 
  -- Please import this qualified.
 module NES.ASoundEngine (
-    ASoundEngine, a_sound_engine, initialize, set_stream, run,
+    ASoundEngine, a_sound_engine', initialize', set_stream', run',
     note, delay, loop, repeat, set_env, call
 ) where
 
@@ -13,7 +13,7 @@ import Data.Typeable
 import Assembler
 import ASM
 import ASM6502
-import NES hiding (initialize)
+import NES hiding (initialize')
 import NES.Reservations
 import Text.Printf
 
@@ -28,13 +28,13 @@ engine_reps = (+ 0x10) . section_start . engine_state  -- Takes up two slots for
 engine_size = 0x20 :: Word16
 
  -- Takes a note table as input.
-a_sound_engine :: Section6502 () -> ASM6502 ASoundEngine
-a_sound_engine note_table = do
+a_sound_engine' :: Section6502 () -> ASM6502 ASoundEngine
+a_sound_engine' note_table = do
     state <- res engine_size
     return $ ASoundEngine note_table state
 
-initialize :: ASoundEngine -> ASM6502 (Section6502 ())
-initialize engine = sect "NES.ASoundEngine.initialize" $ mdo
+initialize' :: ASoundEngine -> ASM6502 (Section6502 ())
+initialize' engine = sect "NES.ASoundEngine.initialize" $ mdo
     let init_part :: Word16 -> ASM6502 ()
         init_part chn = do
          -- We're assuming memory has been zeroed out.
@@ -43,14 +43,14 @@ initialize engine = sect "NES.ASoundEngine.initialize" $ mdo
     init_part NES.pulse2
     init_part NES.triangle
 
-set_stream engine chn stream = sect "NES.ASoundEngine.set_stream" $ mdo
+set_stream' engine chn stream = sect "NES.ASoundEngine.set_stream" $ mdo
     ldai (low stream)
     sta (engine_position engine + chn)
     ldai (high stream)
     sta (engine_position engine + chn + 1)
 
-run :: ASoundEngine -> ASM6502 (Section6502 ())
-run engine = sect "NES.ASoundEngine.run" $ mdo
+run' :: ASoundEngine -> ASM6502 (Section6502 ())
+run' engine = sect "NES.ASoundEngine.run" $ mdo
      -- X is always the channel offset (0, 4, 8, or c)
      -- Y is either the low end of pos or the note index.
     let note_table = engine_note_table engine

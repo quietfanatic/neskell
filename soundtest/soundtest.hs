@@ -19,10 +19,10 @@ main = do
 (_, prgbank) = asm 0xc000 $ mdo
     let [bg_color] = allocate8 0x10 [1]
 
-    sound <- S.a_sound_engine note_table
+    sound <- S.a_sound_engine' note_table
 
     reset <- sect "reset" $ mdo
-        NES.initialize
+        NES.initialize'
 
          -- Set background color
         NES.set_ppuaddr 0x3f00
@@ -38,10 +38,10 @@ main = do
         NES.apumode *<- NES.sequencer_mode_bit .|. NES.disable_frame_irq_bit
 
 
-        S.initialize sound
-        S.set_stream sound NES.pulse1 pulse1_stream2
-        S.set_stream sound NES.pulse2 pulse2_stream2
-        S.set_stream sound NES.triangle triangle_stream2
+        S.initialize' sound
+        S.set_stream' sound NES.pulse1 pulse1_stream2
+        S.set_stream' sound NES.pulse2 pulse2_stream2
+        S.set_stream' sound NES.triangle triangle_stream2
 
         idle <- here
         jmp idle
@@ -50,7 +50,7 @@ main = do
         NES.set_ppuaddr 0x3f00
         start bg_color *->* NES.ppudata
 
-        S.run sound
+        S.run' sound
 
         rti
 

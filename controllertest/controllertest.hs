@@ -51,12 +51,12 @@ main = do
 
      -- UTILITY VALUES
 
-    let init_ball = sect "init_ball" $ mdo
+    let init_ball' = sect "init_ball" $ mdo
         ldai 0x80
         sta (xc ball)
         sta (yc ball)
 
-    let move_ball = sect "move_ball" $ mdo
+    let move_ball' = sect "move_ball" $ mdo
         let bump GT = inc
             bump LT = dec
             unbump GT = dec
@@ -117,7 +117,7 @@ main = do
 
 
     reset <- sect "reset" $ mdo
-        NES.initialize
+        NES.initialize'
          -- Load all the palettes
         NES.set_ppuaddr 0x3f00
         fordeyin all_palettes $ mdo
@@ -157,13 +157,13 @@ main = do
         NES.ppumask *<- NES.dont_clip_background_bit .|. NES.dont_clip_sprites_bit
                     .|. NES.enable_background_bit .|. NES.enable_sprites_bit
 
-        init_ball
+        init_ball'
          -- Done with everything
         idle <- here
         jmp idle
 
     nmi <- sect "nmi" $ mdo
-        NES.read_input_to input1
+        NES.read_input_to' input1
          -- Start sprite memory transfer
         0x00 ->* NES.oamaddr
         0x40 ->* sprites_left
@@ -181,7 +181,7 @@ main = do
             ldax btnspr_x >> sta NES.oamdata
             dec sprites_left
          -- Draw the ball
-        move_ball
+        move_ball'
         low ball_model ->* 0x00
         high ball_model ->* 0x01
         xc ball *->* 0x02

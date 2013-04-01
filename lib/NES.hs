@@ -114,7 +114,7 @@ apumode = 0x4017 :: Word16
 disable_frame_irq_bit = bit 6 :: Word8
 sequencer_mode_bit = bit 7 :: Word8
 
-initialize_begin = do
+initialize_begin' = do
     sei
     cld
     disable_frame_irq_bit ->* apumode
@@ -128,7 +128,7 @@ initialize_begin = do
      -- wait for first vblank
     rep bpl (bitm ppustatus)
 
-clear_memory = do
+clear_memory' = do
     repfor (ldxi 0x00) (dex >>. bne) $ do
         ldai 0x00
         stax 0x00
@@ -140,15 +140,15 @@ clear_memory = do
         stax 0x0600
         stax 0x0700
 
-initialize_end = do
+initialize_end' = do
      -- wait for second vblank
     rep bpl (bitm ppustatus)
 
-initialize_custom_clear clear = sect "NES.initialize" (initialize_begin >> clear >> initialize_end)
-initialize = initialize_custom_clear clear_memory
+initialize_custom_clear' clear = sect "NES.initialize" (initialize_begin' >> clear >> initialize_end')
+initialize' = initialize_custom_clear' clear_memory'
 
-read_input_to :: (Integral a, Bounded a) => a -> ASM6502 (Section6502 ())
-read_input_to spot = sect "NES.read_input_to" $ do
+read_input_to' :: (Integral a, Bounded a) => a -> ASM6502 (Section6502 ())
+read_input_to' spot = sect "NES.read_input_to" $ do
      -- Freeze controllers for polling
     0x01 ->* NES.controller1
     0x00 ->* NES.controller1
