@@ -25,7 +25,7 @@ op8 name a x = byte a >> Assembler f where
     f (ann, pos) = let
         res = case no_overflow x :: Maybe Word8 of
             Just w8 -> S.singleton w8
-            Nothing -> error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x)"
+            Nothing -> error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x > 0xff)"
                                      name (appendable_section_name ann) (toInteger pos) (toInteger x)
         in (ann, pos + 1, res, ())
 
@@ -36,7 +36,7 @@ op16 name a x = byte a >> Assembler f where
             Just w8 -> fromIntegral w8
             Nothing -> case no_overflow x :: Maybe Word16 of
                 Just w16 -> w16
-                Nothing -> error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x)"
+                Nothing -> error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x > 0xffff)"
                                          name (appendable_section_name ann) (toInteger pos) (toInteger x)
         res = S.singleton (fromIntegral res16) S.>< S.singleton (fromIntegral (B.shiftR res16 8))
         in (ann, pos + 2, res, ())
@@ -62,7 +62,7 @@ op8or16' max name a b x = case toInteger max of
         Nothing -> case no_overflow x :: Maybe Word16 of
             Just w16 -> byte b >> le16 w16
             Nothing -> Assembler f where
-                f (ann, pos) = error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x)"
+                f (ann, pos) = error$ printf "Overflow error in argument to %s%s at 0x%x (0x%x > 0xffff)"
                                              name (appendable_section_name ann) (toInteger pos) (toInteger x)
 
  -- HACK HACK HACK

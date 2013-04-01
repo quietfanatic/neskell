@@ -14,7 +14,7 @@ module Assembler (
     modify_annotation, with_annotation,
     Section(..), section_annotations, section_name, section_start, section_size, section_end, section_return,
     start, size, end,
-    section, sect, sect_maybe, allocate, allocate_named, allocate1, allocate1_named, provide,
+    section, sect, allocate, allocate_named, allocate1, allocate1_named, provide,
     section_merge, appendable_section_name, get_section, current_section
 ) where
 
@@ -217,7 +217,7 @@ with_annotation x inner = do
  --  one in RAM.  It may have a name, it may have annotations, and it may have
  --  a return value, but it always has a start and end.
 
-data Section ctr a = Section Annotations (Maybe String) ctr ctr a
+data Section ctr a = Section Annotations String ctr ctr a
  -- Sections may carry Annotations in case they're needed.
  -- The set of annotations is that which was in effect when the section ended.
 section_annotations :: Section ctr a -> Annotations
@@ -225,7 +225,7 @@ section_annotations (Section x _ _ _ _) = x
  -- The name of a section is primarily for diagnostic purposes, i.e.
  --  if there's an error in the code somewhere, the error message can
  --  tell you what section it is in.
-section_name :: Section ctr a -> Maybe String
+section_name :: Section ctr a -> String
 section_name (Section _ x _ _ _) = x
 section_start :: Section ctr a -> ctr
 section_start (Section _ _ x _ _) = x
@@ -256,23 +256,18 @@ newtype CurrentSection = CurrentSection (Section Unknown Unknown) deriving (Type
 
  -- Wraps the code in an unnamed section
 section :: (Monoid mon, Integral ctr) => Assembler mon ctr a -> Assembler mon ctr (Section ctr a)
-section = sect_maybe Nothing
-
-sect :: (Monoid mon, Integral ctr) => String -> Assembler mon ctr a -> Assembler mon ctr (Section ctr a)
-sect = sect_maybe . Just
+section = sect ""
 
  -- Wraps the code in a named section, prepending it with the outer section name and "/"
-sect_maybe :: (Monoid mon, Integral ctr) => Maybe String -> Assembler mon ctr a -> Assembler mon ctr (Section ctr a)
-sect_maybe maybename inner = mdo
-    let newmaybename = do  -- Maybe monad
-            name <- maybename
+sect :: (Monoid mon, Integral ctr) => String -> Assembler mon ctr a -> Assembler mon ctr (Section ctr a)
+sect name inner = mdo
+    let newname = if null name then name else fromMaybe name $ do  -- Maybe monad
             CurrentSection oldsection <- old
-            oldname <- section_name oldsection
-            return (oldname ++ "/" ++ name)
-        sect = Section ann newmaybename start end ret
-        add_named_section (NamedSections map) = case newmaybename of
-            Just newname -> NamedSections (M.insertWith (++) newname [section_erase_types sect] map)
-            Nothing -> NamedSections map
+            return (section_name oldsection ++ "/" ++ name)
+        sect = Section ann newname start end ret
+        add_named_section (NamedSections map) = case newname of
+            "" -> NamedSections map
+            newname -> NamedSections (M.insertWith (++) newname [section_erase_types sect] map)
     old <- get_annotation
     set_annotation (CurrentSection (section_erase_types sect))
     modify_annotation (NamedSections M.empty) add_named_section
@@ -280,7 +275,7 @@ sect_maybe maybename inner = mdo
     ret <- inner
     end <- here
     ann <- get_all_annotations
-    set_annotation old
+    set_annotation_maybe old
     return sect
 
 
@@ -290,22 +285,22 @@ sect_maybe maybename inner = mdo
 allocate :: (Num ctr, Integral siz) => ctr -> [siz] -> [Section ctr ()]
 allocate prev [] = []
 allocate prev (z:zs) = let
-    s = Section M.empty Nothing prev (prev + fromIntegral z) ()
+    s = Section M.empty "" prev (prev + fromIntegral z) ()
     in s : allocate (end s) zs
  -- Like above but give the sections names as well.
 allocate_named :: (Num ctr, Integral siz) => ctr -> [(String, siz)] -> [Section ctr ()]
 allocate_named prev [] = []
 allocate_named prev ((n,z):nzs) = let
-    s = Section M.empty (Just n) prev (prev + fromIntegral z) ()
+    s = Section M.empty n prev (prev + fromIntegral z) ()
     in s : allocate_named (end s) nzs
 
  -- Like allocate but just make one Section.
 allocate1 :: (Num ctr, Integral siz) => ctr -> siz -> Section ctr ()
-allocate1 prev z = Section M.empty Nothing prev (prev + fromIntegral z) ()
+allocate1 prev z = Section M.empty "" prev (prev + fromIntegral z) ()
 
  -- Like allocate1 but gives it a name.
 allocate1_named :: (Num ctr, Integral siz) => String -> ctr -> siz -> Section ctr ()
-allocate1_named name prev z = Section M.empty (Just name) prev (prev + fromIntegral z) ()
+allocate1_named name prev z = Section M.empty name prev (prev + fromIntegral z) ()
 
  -- Ensure that the given code satisfies the given section.
  --  It also propagates the name of the allocated section into the code.
@@ -313,25 +308,25 @@ allocate1_named name prev z = Section M.empty (Just name) prev (prev + fromInteg
  --   be otherwise would just be a big pain.
 provide :: (Monoid mon, Integral ctr) => Section ctr a -> Assembler mon ctr b -> Assembler mon ctr (Section ctr b)
 provide allocation code = do
-    let sectifier = maybe section sect (section_name allocation)
     enforce_counter (start allocation)
-    ret <- sectifier code
+    ret <- sect (section_name allocation) code
     enforce_counter (end allocation)
     return ret
 
  -- Merge adjacent (allocated) Sections together.  Will fail if they're not adjacent.
 section_merge :: Integral ctr => Section ctr a -> Section ctr b -> Section ctr b
 section_merge a b = if end a == start b
-    then Section M.empty Nothing (start a) (end b) (section_return b)
+    then Section M.empty "" (start a) (end b) (section_return b)
     else error$ printf "Tried to merge nonadjacent sections (0x%x..0x%x and 0x%x..0x%x)"
         (toInteger (start a)) (toInteger (end a)) (toInteger (start b)) (toInteger (end b))
 
  -- Get the name of the current section in a format that's appropriate for error messages
 appendable_section_name :: Annotations -> String
-appendable_section_name ann = fromMaybe "" $ do -- Maybe monad
-    CurrentSection sec <- annotations_get ann
-    name <- section_name sec
-    return $ " in \"" ++ name ++ "\""
+appendable_section_name ann = case annotations_get ann of
+    Just (CurrentSection sec) -> case section_name sec of
+        "" -> ""
+        name -> " in \"" ++ name ++ "\""
+    Nothing -> ""
 
  -- Returns the section currently being processed.
 current_section :: (Monoid mon, Integral ctr) => Assembler mon ctr (Maybe (Section ctr Unknown))
@@ -354,17 +349,17 @@ get_section name asg = case annotations_get (assemblage_annotations asg) of
 
  -- Sections have to be able to act like integers.
 instance Num ctr => Num (Section ctr a) where
-    a + b = Section M.empty Nothing (start a + start b) (start a + start b) (noreturn "(+)")
-    a - b = Section M.empty Nothing (start a - start b) (start a + start b) (noreturn "(-)")
+    a + b = Section M.empty "" (start a + start b) (start a + start b) (noreturn "(+)")
+    a - b = Section M.empty "" (start a - start b) (start a + start b) (noreturn "(-)")
     (*) = cantXsection "(*)"
     abs = cantXsection "abs"
     signum = cantXsection "signum"
-    fromInteger x = Section M.empty Nothing (fromInteger x) (fromInteger x) (noreturn "fromInteger")
+    fromInteger x = Section M.empty "" (fromInteger x) (fromInteger x) (noreturn "fromInteger")
 
 
 instance Enum ctr => Enum (Section ctr a) where
-    succ a = Section M.empty Nothing (succ (start a)) (succ (start a)) (noreturn "succ")
-    pred a = Section M.empty Nothing (pred (start a)) (pred (start a)) (noreturn "pred")
+    succ a = Section M.empty "" (succ (start a)) (succ (start a)) (noreturn "succ")
+    pred a = Section M.empty "" (pred (start a)) (pred (start a)) (noreturn "pred")
     toEnum = error$ "Can't toEnum to get a Section"
     fromEnum = error$ "Can't fromEnum Section (you can toInteger it though)"
 
@@ -387,8 +382,8 @@ instance Integral ctr => Integral (Section ctr a) where
     toInteger = toInteger . start
 
 instance Bounded ctr => Bounded (Section ctr a) where
-    minBound = Section M.empty Nothing minBound minBound (noreturn "minBound")
-    maxBound = Section M.empty Nothing maxBound maxBound (noreturn "maxBound")
+    minBound = Section M.empty "" minBound minBound (noreturn "minBound")
+    maxBound = Section M.empty "" maxBound maxBound (noreturn "maxBound")
 
 cantXsection name = error $ "Can't " ++ name ++ " Section."
 noreturn name = error $ "Section generated from " ++ name ++ " has no section_return."
