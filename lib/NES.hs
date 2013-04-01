@@ -1,6 +1,7 @@
 module NES where
 
 import Data.Word
+import Assembler
 import ASM
 import ASM6502 hiding (bit)
 import Data.Bits
@@ -146,5 +147,21 @@ initialize_end = do
 initialize_custom_clear clear = initialize_begin >> clear >> initialize_end
 initialize = initialize_custom_clear clear_memory
 
+read_input_to :: (Integral a, Bounded a) => a -> ASM6502 (Section6502 ())
+read_input_to spot = sect "NES.read_input_to" $ do
+     -- Freeze controllers for polling
+    0x01 ->* NES.controller1
+    0x00 ->* NES.controller1
+     -- Roll bits in one at a time
+    repfor (ldxi 0x01) (dex >>. bpl) $ do
+        repfor (ldyi 0x07) (dey >>. bpl) $ do
+            ldax NES.controller1
+            lsra
+            rolx spot
+
+[btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] =
+    map (shiftL 1) [0..7] :: [Word8]
+
 [nmi, reset, irq] = allocate16 0xfffa [2, 2, 2]
+
 

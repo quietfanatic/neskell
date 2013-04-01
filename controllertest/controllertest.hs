@@ -51,10 +51,6 @@ main = do
 
      -- UTILITY VALUES
 
-    let btn_right : btn_left : btn_down : btn_up :
-         btn_start : btn_select : btn_b : btn_a :
-         _ = map (shiftL 1) [0..] :: [Word8]
-
     let init_ball = sect "init_ball" $ mdo
         ldai 0x80
         sta (xc ball)
@@ -79,17 +75,17 @@ main = do
                         bump dir (coord camera)
                         bump dir (coord screen)
                         flipper
-        move btn_left xc LT 0x40 $ do
+        move NES.btn_left xc LT 0x40 $ do
             skip (lda (xc screen) >> cmpi 0xff >>. bne) $ do
                 NES.nametable_x_bit -^>* save_ppuctrl
-        move btn_right xc GT 0xc1 $ do
+        move NES.btn_right xc GT 0xc1 $ do
             skip bne $ do
                 NES.nametable_x_bit -^>* save_ppuctrl
-        move btn_up yc LT 0x40 $ do
+        move NES.btn_up yc LT 0x40 $ do
             skip (lda (yc screen) >> cmpi 0xff >>. bne) $ do
                 0xef ->* (yc screen)
                 NES.nametable_y_bit -^>* save_ppuctrl
-        move btn_down yc GT 0xb1 $ do
+        move NES.btn_down yc GT 0xb1 $ do
             skip (lda (yc screen) >> cmpi 0xf0 >>. bne) $ do
                 0x00 ->* (yc screen)
                 NES.nametable_y_bit -^>* save_ppuctrl
@@ -119,17 +115,6 @@ main = do
             dey
         rts
 
-    let read_controllers = sect "read_controllers" $ mdo
-         -- Freeze controllers for polling
-        0x01 ->* NES.controller1
-        0x00 ->* NES.controller1
-        let read port bits = mdo
-                repfor (ldxi 0x07) (dex >>. bpl) $ mdo
-                    lda port
-                    lsra
-                    rol bits
-        read NES.controller1 input1
-        read NES.controller2 input2
 
     reset <- sect "reset" $ mdo
         NES.initialize
@@ -178,7 +163,7 @@ main = do
         jmp idle
 
     nmi <- sect "nmi" $ mdo
-        read_controllers
+        NES.read_input_to input1
          -- Start sprite memory transfer
         0x00 ->* NES.oamaddr
         0x40 ->* sprites_left
@@ -199,8 +184,8 @@ main = do
         move_ball
         low ball_model ->* 0x00
         high ball_model ->* 0x01
-        (xc ball) *->* 0x02
-        (yc ball) *->* 0x03
+        xc ball *->* 0x02
+        yc ball *->* 0x03
         ldyi (size ball_model)
         jsr draw_model
          -- Stow away any unused sprites
