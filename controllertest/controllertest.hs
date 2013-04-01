@@ -7,16 +7,25 @@ import ASM
 import ASM6502
 import qualified NES
 import NES.Reservations
+import NES.ImageLoader
+import Codec.Picture.Types
 import Data.Word
 import Data.Bits ((.|.), shiftL)
 import Data.Monoid
 import Debug.Trace
 import Text.Printf
 
+palette :: PixelRGBA8 -> Int
+palette (PixelRGBA8 0 0 0 255) = 0
+palette (PixelRGBA8 90 90 90 255) = 0
+palette (PixelRGBA8 180 180 180 255) = 0
+palette (PixelRGBA8 255 255 255 255) = 0
+palette (PixelRGBA8 r g b a) = error $ printf "Unrecognized pixel value: %u %u %u %u" r g b a
+
 main = do
     B.putStr $ NES.header 0x01 0x01 0x00 0x00
     B.putStr $ asm_result prgbank
-    sprites <- B.readFile "controllertest/sprites.bin"
+    sprites <- file_to_chr palette "controllertest/sprites.png"
     B.putStr $ sprites
     B.putStr $ B.replicate (0x1000 - B.length sprites) 0xff
     background <- B.readFile "controllertest/background.bin"
