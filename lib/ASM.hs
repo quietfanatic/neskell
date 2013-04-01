@@ -7,7 +7,6 @@ module ASM (
     le16, be16, le32, be32, le64, be64, lefloat, befloat, ledouble, bedouble,
     nothing, here,
     no_overflow,
-    startof, endof, startend, sizeof,
     rep, repfor, skip, (>>.),
     allocate8, allocate16, allocate32, allocate64
 ) where
@@ -126,25 +125,6 @@ no_overflow' min max x = if toInteger min <= toInteger x && toInteger x <= toInt
 
 no_overflow :: (Integral a, Integral b, Bounded b) => a -> Maybe b
 no_overflow = no_overflow' minBound maxBound
-
-startof x = do
-    start <- here
-    x
-    return start
-
-endof x = x >> here
-
-startend x = do
-    start <- here
-    x
-    end <- here
-    return (start, end)
-
-sizeof x = do
-    start <- here
-    x
-    end <- here
-    return (end - start)
 
 rep :: Integral ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
 rep branch code = mdo
