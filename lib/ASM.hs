@@ -32,12 +32,12 @@ asm = assemble
 asm_result :: ASMblage ctr -> B.ByteString
 asm_result = B.pack . F.toList . assemblage_result
 
-byte :: Num ctr => Word8 -> ASM ctr ()
-byte = unit_assembler . S.singleton
+byte :: (Integral a, Num ctr) => a -> ASM ctr ()
+byte = unit_assembler . S.singleton . fromIntegral
 
-bytes :: Num ctr => F.Foldable t => t Word8 -> ASM ctr ()
+bytes :: (Integral a, Num ctr) => F.Foldable t => t a -> ASM ctr ()
 bytes bs = Assembler f where
-    f (ann, pos) = (ann, F.foldl (const . (+ 1)) pos bs, S.fromList (F.toList bs), ())
+    f (ann, pos) = (ann, F.foldl (const . (+ 1)) pos bs, S.fromList (map fromIntegral (F.toList bs)), ())
 
 ascii :: Num ctr => [Char] -> ASM ctr ()
 ascii = bytes . map (fromIntegral . ord)

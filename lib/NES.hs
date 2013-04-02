@@ -59,6 +59,18 @@ ppudata = 0x2007 :: Word16
 
 sprite_dma = 0x4014 :: Word16
 
+ -- VRAM ADDRESSES
+
+vram_pattern_table_0 = 0x0000
+vram_pattern_table_1 = 0x1000
+vram_name_table_0 = 0x2000
+vram_name_table_1 = 0x2400
+vram_name_table_2 = 0x2800
+vram_name_table_3 = 0x2c00
+vram_palettes = 0x3f00
+vram_background_palettes = 0x3f00
+vram_sprite_palettes = 0x3f10
+
  -- APU STUFF
 
 chn_env = 0x4000 :: Word16

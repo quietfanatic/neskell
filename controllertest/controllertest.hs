@@ -119,12 +119,12 @@ main = do
     reset <- sect "reset" $ mdo
         NES.initialize'
          -- Load all the palettes
-        NES.set_ppuaddr 0x3f00
+        NES.set_ppuaddr NES.vram_palettes
         fordeyin all_palettes $ mdo
             lday all_palettes
             sta NES.ppudata
          -- Draw background
-        NES.set_ppuaddr 0x2000
+        NES.set_ppuaddr NES.vram_name_table_0
          -- name table
         repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
             let col = 0x00

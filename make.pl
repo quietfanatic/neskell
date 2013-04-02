@@ -17,7 +17,7 @@ workflow {
     sub module {
         my ($name) = @_;
         rule dotexe($name), doths($name), sub {
-            system 'ghc', '-ilib', '-fno-warn-deprecated-flags', doths($name), '-o', dotexe($name);
+            system 'ghc', '-ilib', "-i$name", '-fno-warn-deprecated-flags', doths($name), '-o', dotexe($name);
         };
         rule dotnes($name), dotexe($name), sub {
             system(dotexe($name) . ' > ' . dotnes($name));
@@ -32,10 +32,13 @@ workflow {
     subdep doths('soundtest'), 'lib/NES/ASoundEngine.hs';
     subdep doths('controllertest'), [qw(lib/NES.hs lib/NES/Reservations.hs lib/NES/ImageLoader.hs)];
     subdep dotexe('controllertest'), [qw(controllertest/sprites.png controllertest/background.bin)];
+    subdep 'agame/Actors.hs', 'lib/NES/Reservations.hs';
+    subdep doths('agame'), [qw(agame/Actors.hs lib/NES/Reservations.hs)];
     module 'soundtest';
     module 'controllertest';
+    module 'agame';
 
-    phony 'build', [dotnes('soundtest'), dotnes('controllertest')], sub { };
+    phony 'build', [dotnes('soundtest'), dotnes('controllertest'), dotnes('agame')], sub { };
 
     phony 'clean', [], sub {
         unlink glob '*/*.nes */*.exe */*.hi */*.o */*/*.hi */*/*.o';
