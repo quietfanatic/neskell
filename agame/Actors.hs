@@ -1,4 +1,6 @@
 
+{-# LANGUAGE RecursiveDo #-}
+
 module Actors where
 
 import Assembler
@@ -12,12 +14,15 @@ import Text.Printf
 data Actors = Actors {
     amount :: Word8,
     t_models :: Section6502 (),
-    camera :: Section Word8 (),
     xs :: Section Word8 (),
     ys :: Section Word8 (),
     ts :: Section Word8 (),
     fs :: Section Word8 (),
-    draw_actors' :: ASM6502 (Section6502 ())
+    camera :: Section Word8 (),
+    sprites_left :: Section Word8 (),
+    start_draw' :: ASM6502 (Section6502 ()),
+    draw_actors' :: ASM6502 (Section6502 ()),
+    finish_draw' :: ASM6502 (Section6502 ())
 }
 
 actors' :: Word8 -> Section6502 () -> ASM6502 Actors
@@ -30,11 +35,19 @@ actors' amount t_models = do
         ys <- resz amount
         ts <- resz amount
         fs <- resz amount
-        camera <- resz 0x02
+        camera <- resz 2
+        sprites_left <- resz 1
         return Actors {
             amount = amount,
             t_models = t_models,
             xs=xs, ys=ys, ts=ts, fs=fs, camera=camera,
+            sprites_left=sprites_left,
+            start_draw' = sect "Actors.start_draw" $ do
+                ldai 0x40
+                sta sprites_left
+                ldai 0x00
+                sta NES.oamaddr
+            ,
             draw_actors' = sect "Actors.draw_actors" $ do
                 let modelp = 0x00
                     model_size = 0x02
@@ -68,6 +81,19 @@ actors' amount t_models = do
                         sub (camera + 1)
                         sta NES.oamdata
                         iny
+                        dec sprites_left
+            ,
+            finish_draw' = sect "Actors.finish_draw" $ mdo
+                ldx sprites_left
+                beq ギリギリ
+                lda 0xfe
+                rep (dex >>. bne) $ do
+                    sta NES.oamdata
+                    sta NES.oamdata
+                    sta NES.oamdata
+                    sta NES.oamdata
+                ギリギリ <- here
+                nothing
         }
     return (section_return s)
 

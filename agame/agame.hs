@@ -34,7 +34,9 @@ main = do
         lda (NES.background_1000_bit .|. NES.enable_nmi_bit)
         sta NES.ppuctrl
     nmi <- sect "nmi" $ do
+        A.start_draw' actors
         A.draw_actors' actors
+        A.finish_draw' actors
 
     palettes <- section $ do
         hexdata "0f 07 0a 1a"
