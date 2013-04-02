@@ -29,14 +29,16 @@ main = do
         forinyin palettes $ do
             lday palettes
             sta NES.ppudata
-        lda (NES.enable_background_bit .|. NES.enable_sprites_bit)
-        sta NES.ppumask
         lda (NES.background_1000_bit .|. NES.enable_nmi_bit)
         sta NES.ppuctrl
+        lda (NES.enable_background_bit .|. NES.enable_sprites_bit)
+        sta NES.ppumask
+    idle <- sect "idle" (jmp idle)
     nmi <- sect "nmi" $ do
         A.start_draw' actors
         A.draw_actors' actors
         A.finish_draw' actors
+        rti
 
     palettes <- section $ do
         hexdata "0f 07 0a 1a"
