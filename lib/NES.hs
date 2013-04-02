@@ -174,6 +174,7 @@ read_input_to' spot = sect "NES.read_input_to" $ do
 [btn_right, btn_left, btn_down, btn_up, btn_start, btn_select, btn_b, btn_a] =
     map (shiftL 1) [0..7] :: [Word8]
 
-[nmi, reset, irq] = allocate16 0xfffa [2, 2, 2]
+[nmi, reset, irq] = allocate_named (0xfffa::Word16)
+    [("NES.nmi", 2), ("NES.reset", 2), ("NES.irq", 2)]
 
 

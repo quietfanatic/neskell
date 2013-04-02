@@ -126,13 +126,17 @@ pad_assembler size filling (Assembler inner) = Assembler f where
         in (ann2, pos + size, payload, ir)
 
  -- Make sure the counter is at a certain spot.  Used in, for instance, provide
-enforce_counter :: (Monoid mon, Integral ctr) => ctr -> Assembler mon ctr ()
-enforce_counter expected = Assembler f where
+enforce_counter :: (Monoid mon, Integral ctr) => ctr -> String -> Assembler mon ctr ()
+enforce_counter expected name = Assembler f where
     f (ann, got) = let
+        errmess = if null name
+            then printf "enforce_counter encountered an incorrect counter (0x%x /= 0x%x)%s"
+                        (toInteger got) (toInteger expected) (appendable_section_name ann)
+            else printf "%s is in the wrong place (0x%x /= 0x%x)%s"
+                        name (toInteger got) (toInteger expected) (appendable_section_name ann)
         payload = if got == expected
             then mempty
-            else error$ printf "Something was misaligned%s (0x%x /= 0x%x)"
-                               (appendable_section_name ann) (toInteger got) (toInteger expected)
+            else error errmess
         in (ann, expected, payload, ())
 
  -- Debug.Trace.trace the current counter value
@@ -330,9 +334,9 @@ allocate1_named name prev z = Section M.empty name prev (prev + fromIntegral z) 
  --   be otherwise would just be a big pain.
 provide :: (Monoid mon, Integral ctr) => Section ctr a -> Assembler mon ctr b -> Assembler mon ctr (Section ctr b)
 provide allocation code = do
-    enforce_counter (start allocation)
+    enforce_counter (start allocation) (section_name allocation)
     ret <- sect (section_name allocation) code
-    enforce_counter (end allocation)
+    enforce_counter (end allocation) (section_name allocation)
     return ret
 
  -- Merge adjacent (allocated) Sections together.  Will fail if they're not adjacent.
