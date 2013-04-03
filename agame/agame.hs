@@ -12,7 +12,7 @@ import qualified Actors as A
 import Data.Bits
 
 main = do
-    B.putStr $ NES.header 0x01 0x01 0x00 0x00
+    B.putStr $ NES.header 0x01 0x01 0x01 0x02
     B.putStr $ asm_result prgbank
     sprites <- file_to_chr greyscale_palette "agame/sprites.png"
     B.putStr $ sprites
@@ -39,6 +39,11 @@ main = do
         sta 0x8000
         lsra
         sta 0x8000
+        sta 0xe000
+        sta 0xe000
+        sta 0xe000
+        sta 0xe000
+        sta 0xe000
         NES.set_ppuaddr NES.vram_palettes
         forinyin palettes $ do
             lday palettes
@@ -46,10 +51,10 @@ main = do
          -- For testing purposes, let's try writing to sram
         ldyi 0x00
         ldxi 0x00
---        rep (iny >>. bne) $ do
---            txa
---            stay 0x6000
---            inx
+        rep (iny >>. bne) $ do
+            txa
+            stay 0x6000
+            inx
         NES.set_ppuaddr (NES.vram_nametable_0 + 36)
         ldyi 0x00 >> sty NES.ppudata
         iny >> sty NES.ppudata
