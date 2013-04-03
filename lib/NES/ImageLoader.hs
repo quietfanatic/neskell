@@ -8,11 +8,11 @@ import qualified Codec.Picture.Types as PT
 
 greyscale_palette :: (P.PixelRGBA8 -> Int)
 greyscale_palette (P.PixelRGBA8 r g b a) = let
-    total = r + g + b
-    in    if total <= (255 * 3 `div` 4) then 0
-     else if total <= (255 * 6 `div` 4) then 1
-     else if total <= (255 * 9 `div` 4) then 2
-     else                                    3
+    total = sum $ map toInteger $ [r, g, b]
+    in    if total <= (64 * 3)  then 0
+     else if total <= (128 * 3) then 1
+     else if total <= (192 * 3) then 2
+     else                            3
 
 bits_to_bytes :: [Bool] -> [Word8]
 bits_to_bytes [] = []

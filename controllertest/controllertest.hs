@@ -124,7 +124,7 @@ main = do
             lday all_palettes
             sta NES.ppudata
          -- Draw background
-        NES.set_ppuaddr NES.vram_name_table_0
+        NES.set_ppuaddr NES.vram_nametable_0
          -- name table
         repfor (ldxi 0x00) (cpxi (size background) >>. bne) $ mdo
             let col = 0x00

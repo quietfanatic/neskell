@@ -63,7 +63,7 @@ actors' amount t_models = do
                     ldayp modelp
                     sta model_size
                     iny
-                    rep (cpy model_size >>. bne) $ do
+                    rep (cpy model_size >>. bcc) $ do
                         ldayp modelp
                         clc >> adcx ys
                         sub (camera + 0)

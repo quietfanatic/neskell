@@ -57,16 +57,24 @@ set_ppuaddr w16 = do
     low w16 ->* ppuaddr
 ppudata = 0x2007 :: Word16
 
-sprite_dma = 0x4014 :: Word16
+oam_dma = 0x4014 :: Word16
+
+set_oam_dma w16 = do
+    low w16 ->* ppuaddr
+    high w16 ->* oam_dma
 
  -- VRAM ADDRESSES
 
 vram_pattern_table_0 = 0x0000
 vram_pattern_table_1 = 0x1000
-vram_name_table_0 = 0x2000
-vram_name_table_1 = 0x2400
-vram_name_table_2 = 0x2800
-vram_name_table_3 = 0x2c00
+vram_nametable_0 = 0x2000
+vram_nametable_1 = 0x2400
+vram_nametable_2 = 0x2800
+vram_nametable_3 = 0x2c00
+vram_attribute_table_0 = 0x23c0
+vram_attribute_table_1 = 0x27c0
+vram_attribute_table_2 = 0x2bc0
+vram_attribute_table_3 = 0x2fc0
 vram_palettes = 0x3f00
 vram_background_palettes = 0x3f00
 vram_sprite_palettes = 0x3f10
