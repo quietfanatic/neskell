@@ -27,10 +27,29 @@ main = do
     framecounter <- resz 1
     reset <- sect "reset" $ do
         NES.initialize'
+        ldai 0x80
+        sta 0x8000
+        ldai 0x03
+        sta 0x8000
+        lsra
+        sta 0x8000
+        lsra
+        sta 0x8000
+        lsra
+        sta 0x8000
+        lsra
+        sta 0x8000
         NES.set_ppuaddr NES.vram_palettes
         forinyin palettes $ do
             lday palettes
             sta NES.ppudata
+         -- For testing purposes, let's try writing to sram
+        ldyi 0x00
+        ldxi 0x00
+--        rep (iny >>. bne) $ do
+--            txa
+--            stay 0x6000
+--            inx
         NES.set_ppuaddr (NES.vram_nametable_0 + 36)
         ldyi 0x00 >> sty NES.ppudata
         iny >> sty NES.ppudata
