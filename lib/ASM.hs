@@ -126,14 +126,14 @@ no_overflow' min max x = if toInteger min <= toInteger x && toInteger x <= toInt
 no_overflow :: (Integral a, Integral b, Bounded b) => a -> Maybe b
 no_overflow = no_overflow' minBound maxBound
 
-rep :: Integral ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
+rep :: Integral ctr => (ctr -> ASM ctr a) -> ASM ctr b -> ASM ctr b
 rep branch code = mdo
     start <- here
     res <- code
     branch start
     return res
 
-repfor :: Integral ctr => ASM ctr () -> (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
+repfor :: Integral ctr => ASM ctr a -> (ctr -> ASM ctr b) -> ASM ctr c -> ASM ctr c
 repfor init branch code = mdo
     init
     start <- here
@@ -141,7 +141,7 @@ repfor init branch code = mdo
     branch start
     return res
 
-skip :: Integral ctr => (ctr -> ASM ctr ()) -> ASM ctr a -> ASM ctr a
+skip :: Integral ctr => (ctr -> ASM ctr a) -> ASM ctr b -> ASM ctr b
 skip branch code = mdo
     branch end
     res <- code
