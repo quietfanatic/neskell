@@ -7,6 +7,7 @@ BEGIN { %make:: or do { require "$FindBin::Bin/tool/make.pm"; make->import(':all
 use autodie qw(:all);
 
 my $here;
+my @modules;
 
 workflow {
 
@@ -22,6 +23,7 @@ workflow {
         rule dotnes($name), dotexe($name), sub {
             system(dotexe($name) . ' > ' . dotnes($name));
         };
+        push @modules, dotnes($name);
     }
 
     subdep 'lib/ASM.hs', 'lib/Assembler.hs';
@@ -34,11 +36,12 @@ workflow {
     subdep dotexe('controllertest'), [qw(controllertest/sprites.png controllertest/background.bin)];
     subdep 'agame/Actors.hs', 'lib/NES/Reservations.hs';
     subdep doths('agame'), [qw(agame/Actors.hs lib/NES/Reservations.hs)];
+    subdep dotexe('agame'), [qw(agame/sprites.png agame/background.png)];
     module 'soundtest';
     module 'controllertest';
     module 'agame';
 
-    phony 'build', [dotnes('soundtest'), dotnes('controllertest'), dotnes('agame')], sub { };
+    phony 'build', [@modules], sub { };
 
     phony 'clean', [], sub {
         unlink glob '*/*.nes */*.exe */*.hi */*.o */*/*.hi */*/*.o';
