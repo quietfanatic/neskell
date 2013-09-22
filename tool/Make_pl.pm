@@ -1,5 +1,20 @@
 #!/usr/bin/perl
-package make;
+
+ #####
+ #
+ # Make_pl - Portable drop-in build system
+ # https://github.com/quietfanatic/make-pl
+ #
+ # Use, copy, distribute, or hack all you want.  If you publish a modified
+ #  version, record that you've modified it in this header.  Don't remove
+ #  or change anything from this header that wasn't written by yourself.
+ #
+ # Version 2013-07-01
+ #
+ ##### (end of 'this header')
+
+package Make_pl;
+
 use strict;
 use warnings;
 use feature qw(switch say);
@@ -10,16 +25,8 @@ use Carp qw(croak);
 use Cwd qw(cwd realpath);
 use File::Spec::Functions qw(:ALL);
 
-our @EXPORT_OK = qw(workflow rule rules phony subdep defaults include chdir targetmatch run);
-our %EXPORT_TAGS = ('all' => \@EXPORT_OK);
-
- # A "target" is a reference to either a file or a phony.
- # A "rule" has one or more "to" targets and zero or more "from" targets.
-
- # Target structures should be implicitly created when mentioned.  In rules they
- # will be stored relative to the rule's base.  Everywhere else they will be stored
- # with absolute paths.  Rule bases are stored absolute but displayed relative to the
- # original base.
+our @EXPORT = qw(workflow rule rules phony subdep defaults include chdir targetmatch run);
+our %EXPORT_TAGS = ('all' => \@EXPORT);
 
  # This variable is only defined inside a workflow definition.
 our %workflow;
@@ -185,6 +192,7 @@ sub include {
         for (keys %{$workflow{subdeps}}) {
             push @{$this_workflow->{subdeps}{$_}}, @{$workflow{subdeps}{$_}};
         }
+        push @{$this_workflow->{auto_subdeps}}, @{$workflow{auto_subdeps}};
     }
 }
 
@@ -200,10 +208,7 @@ sub targetmatch {
 }
 
 sub run (@) {
-    require IPC::System::Simple;
-    eval { IPC::System::Simple::system(@_) };
-    if ($@) {
-        warn $@;
+    system(@_) == 0 or do {
         my @command = @_;
         ref $_[0] eq 'ARRAY' and shift @command;
         for (@command) {
@@ -212,8 +217,18 @@ sub run (@) {
                 $_ = "'$_'";
             }
         }
-        status("☢ Command failed: @command\n");
-        die "\n";
+         # As per perldoc -f system
+        if ($? == -1) {
+            status(print "☢ Couldn't start command: $!");
+        }
+        elsif ($? & 127) {
+            status(sprintf "☢ Command died with signal %d, %s coredump",
+               ($? & 127),  ($? & 128) ? 'with' : 'without');
+        }
+        else {
+            status(sprintf "☢ Command exited with value %d", $? >> 8);
+        }
+        die_status("☢ Failed command: @command");
     }
 }
 sub realpaths (@) {
@@ -262,17 +277,6 @@ sub modtime {
     return $modtimes{$_[0]} //= (fexists($_[0]) ? (stat $_[0])[9] : 0);
 }
 
- # This routine is stale.
-#sub stale {
-#    my $target = $_[0];
-#    return 1 if (!fexists($_[0]));
-#    for (@{$workflow{targets}{$target}}) {
-#        for (@{$_->{from}}) {
-#            return 1 if stale($_) or modtime($target) < modtime($_);
-#        }
-#    }
-#}
-
 ##### PLANNING
 
 sub init_plan {
@@ -288,7 +292,7 @@ sub plan_target {
     my $rel = abs2rel($target, $original_base);
     unless ($workflow{targets}{$target} or fexists($target)) {
         my $mess = "☢ Cannot find or make $rel" . (@{$plan->{stack}} ? ", required by\n" : "\n");
-        for my $rule (@{$plan->{stack}}) {
+        for my $rule (reverse @{$plan->{stack}}) {
             $mess .= "\t" . debug_rule($rule) . "\n";
         }
         die_status $mess;
@@ -420,5 +424,38 @@ sub run_workflow {
 }
 
 
+##### Generate a make.pl scaffold
+
+if ($^S == 0) {  # We've been called directly
+    my $dir = $ARGV[0];
+    defined $dir or $dir = cwd;
+    -d $dir or die "\e[31m✗\e[0m $dir doesn't seem to be a directory.";
+    require FindBin;
+    my $path_to_pm = abs2rel($FindBin::Bin, $dir);
+    if (-e "$dir/make.pl") {
+        say "\e[31m✗\e[0m Did not generate $dir/make.pl because it already exists.";
+        exit 1;
+    }
+    open my $MAKEPL, '>', "$dir/make.pl";
+    print $MAKEPL <<"END";
+#!/usr/bin/perl
+use strict;
+use warnings;
+use FindBin;
+use if !\$^S, lib => "\$FindBin::Bin/$path_to_pm";
+use Make_pl;
+
+workflow {
+     # Sample rules
+    rule \$program, \$main, sub {
+        run "gcc -Wall \\Q\$main\\E -o \\Q\$program\\E";
+    }
+    rule 'clean', [], sub { unlink \$program; };
+};
+END
+    chmod 0755, $MAKEPL;
+    close $MAKEPL;
+    say "\e[32m✓\e[0m Generated $dir/make.pl.";
+}
 
 1;

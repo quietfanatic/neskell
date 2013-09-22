@@ -3,8 +3,9 @@
 use strict;
 use warnings;
 use FindBin;
-BEGIN { %make:: or do { require "$FindBin::Bin/tool/make.pm"; make->import(':all') } }
-use autodie qw(:all);
+use if !$^S, lib => "$FindBin::Bin/tool";
+use Make_pl;
+use autodie;
 
 my $here;
 my @modules;
@@ -18,10 +19,10 @@ workflow {
     sub module {
         my ($name) = @_;
         rule dotexe($name), doths($name), sub {
-            system 'ghc', '-ilib', "-i$name", '-fno-warn-deprecated-flags', doths($name), '-o', dotexe($name);
+            run 'ghc', '-ilib', "-i$name", '-fno-warn-deprecated-flags', doths($name), '-o', dotexe($name);
         };
         rule dotnes($name), dotexe($name), sub {
-            system(dotexe($name) . ' > ' . dotnes($name));
+            run(dotexe($name) . ' > ' . dotnes($name));
         };
         push @modules, dotnes($name);
     }
