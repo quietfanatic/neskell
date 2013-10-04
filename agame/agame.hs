@@ -7,11 +7,13 @@ import ASM6502
 import NES
 import NES.ImageLoader
 import NES.Reservations
+import NES.Header001
 import qualified Data.ByteString as B
 import qualified Actors as A
 import Data.Bits
 
 main = do
+     -- 1 PRG, 1 CHR, mapper 1, has sram
     B.putStr $ NES.header 0x01 0x01 0x01 0x02
     B.putStr $ asm_result prgbank
     sprites <- file_to_chr greyscale_palette "agame/sprites.png"
@@ -27,23 +29,10 @@ main = do
     framecounter <- resz 1
     reset <- sect "reset" $ do
         NES.initialize'
-        ldai 0x80
-        sta 0x8000
-        ldai 0x03
-        sta 0x8000
-        lsra
-        sta 0x8000
-        lsra
-        sta 0x8000
-        lsra
-        sta 0x8000
-        lsra
-        sta 0x8000
-        sta 0xe000
-        sta 0xe000
-        sta 0xe000
-        sta 0xe000
-        sta 0xe000
+        NES.Header001.reset'
+        NES.Header001.write' 0x8000 0x03  -- Horizontal mirroring
+        NES.Header001.writeA0' 0xe000  -- Enable WRAM
+         -- Load palettes
         NES.set_ppuaddr NES.vram_palettes
         forinyin palettes $ do
             lday palettes
@@ -55,6 +44,7 @@ main = do
             txa
             stay 0x6000
             inx
+         -- Show some tiles
         NES.set_ppuaddr (NES.vram_nametable_0 + 36)
         ldyi 0x00 >> sty NES.ppudata
         iny >> sty NES.ppudata
@@ -65,6 +55,7 @@ main = do
         iny >> sty NES.ppudata
         iny >> sty NES.ppudata
         iny >> sty NES.ppudata
+         -- Set all attributes in nametable 0
         NES.set_ppuaddr NES.vram_attribute_table_0
         ldai 0x50
         sta NES.ppudata
@@ -75,6 +66,7 @@ main = do
         sta NES.ppudata
         sta NES.ppudata
         sta NES.ppudata
+         -- Init inital actor
         ldai 0x80
         sta (A.xs actors)
         sta (A.ys actors)

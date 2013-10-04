@@ -9,6 +9,7 @@ import Data.Char
 import qualified Data.ByteString as B
 
  -- Provides an ines header.
+ -- See http://wiki.nesdev.com/w/index.php/INES for more info.
  --       prgs     chrs     mapper   flags
 header :: Word8 -> Word8 -> Word8 -> Word8 -> B.ByteString
 header prgs chrs mapper flags = let asc = fromIntegral . ord in B.pack [
