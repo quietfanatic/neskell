@@ -45,7 +45,7 @@ use Cwd 'realpath';
 use subs qw(cwd chdir);
 use File::Spec::Functions qw(catfile catpath splitpath abs2rel);
 
-our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir targets run slurp splat which);
+our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir targets exists_or_target run slurp splat which);
 
 # GLOBALS
     our $this_is_root = 1;  # This is set to 0 when recursing.
@@ -215,7 +215,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             if (not @rules) {
                 say "\e[32m✓\e[0m Nothing was done because no rules have been declared.";
             }
-            elsif (not @program) {
+            elsif (not grep defined($_->{recipe}), @program) {
                 say "\e[32m✓\e[0m All up to date.";
             }
             else {
@@ -225,7 +225,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
                         status $rule->{config} ? "⚒ " : "⚙ ", show_rule($rule);
                         delazify($rule);
                         $rule->{recipe}->($rule->{to}, $rule->{from})
-                            unless $simulate;
+                            unless $simulate or not defined $rule->{recipe};
                     }
                 };
                 if ($@) {
@@ -257,7 +257,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
 
     sub create_rule {
         my ($to, $from, $recipe, $package, $file, $line) = @_;
-        ref $recipe eq 'CODE' or croak "Non-code recipe given to rule";
+        ref $recipe eq 'CODE' or !defined $recipe or croak "Non-code recipe given to rule";
         my $rule = {
             caller_file => realpath($file),
             caller_line => $line,
@@ -281,11 +281,11 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     }
 
     sub phony ($;$$) {
-        @_ == 2 and croak "phony was given 2 arguments, but it must have either 1 or 3";
-        for (arrayify($_[0])) {
+        my ($to, $from, $recipe) = @_;
+        for (arrayify($to)) {
             $phonies{realpath($_)} = 1;
         }
-        create_rule(@_, caller) if @_ > 1;
+        create_rule($to, $from, $recipe, caller) if defined $from;
     }
 
     sub subdep ($;$) {
@@ -317,6 +317,10 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
 
     sub targets {
         return keys %targets;
+    }
+
+    sub exists_or_target {
+        return -e $_[0] or exists $targets{realpath($_[0])};
     }
 
     sub arrayify {
