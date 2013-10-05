@@ -7,7 +7,7 @@ module Assembler (
     nothing, here, unit_assembler, return_assembler,
     fail_assembler, fail_assembler_if, generate_fail_message,
     append_assembler, bind_assembler, fix_assembler, pad_assembler,
-    enforce_counter, trace_counter,
+    enforce_counter, trace_counter, enforce_size,
     Annotations, annotations_get, get_all_annotations,
     get_annotation, get_annotation_typed, get_annotation_maybe, get_annotation_maybe_typed, get_annotation_default,
     set_annotation, clear_annotation, set_annotation_maybe,
@@ -138,6 +138,13 @@ enforce_counter expected name = Assembler f where
             then mempty
             else error errmess
         in (ann, expected, payload, ())
+
+enforce_size :: (Monoid mon, Integral ctr) => ctr -> Assembler mon ctr a -> Assembler mon ctr a
+enforce_size size body = do
+    start <- here
+    ret <- body
+    enforce_counter (start + size) ""
+    return ret
 
  -- Debug.Trace.trace the current counter value
 trace_counter :: (Monoid mon, Integral ctr, Show a) => a -> Assembler mon ctr ()
