@@ -1,4 +1,7 @@
-module NES.ImageLoader (file_to_chr, bytestring_to_chr, image_to_chr, greyscale_palette) where
+module NES.ImageLoader (
+    file_to_chr, bytestring_to_chr, image_to_chr, greyscale_palette,
+    file_to_pixels, bytestring_to_pixels, image_to_pixels
+) where
 
 import Data.Bits
 import Data.Word
@@ -41,12 +44,30 @@ image_to_chr pal dynimg = let
     bytes = concatMap bits_to_bytes bits
     in B.pack bytes
 
-e_image_to_chr pal (Left mess) = error mess
-e_image_to_chr pal (Right img) = image_to_chr pal img
+unLeft (Left mess) = error mess
+unLeft (Right val) = val
 
 bytestring_to_chr :: Bits output => (P.PixelRGBA8 -> output) -> B.ByteString -> B.ByteString
-bytestring_to_chr pal = e_image_to_chr pal . P.decodeImage
+bytestring_to_chr pal = image_to_chr pal . unLeft . P.decodeImage
 
 file_to_chr :: Bits output => (P.PixelRGBA8 -> output) -> FilePath -> IO B.ByteString
-file_to_chr pal = fmap (e_image_to_chr pal) . P.readImage
+file_to_chr pal = fmap (image_to_chr pal . unLeft) . P.readImage
 
+image_to_pixels :: P.DynamicImage -> [[P.PixelRGBA8]]
+image_to_pixels dynimg = let
+    img :: P.Image P.PixelRGBA8
+    img = case dynimg of
+        P.ImageY8 i -> PT.promoteImage i
+        P.ImageYA8 i -> PT.promoteImage i
+        P.ImageRGB8 i -> PT.promoteImage i
+        P.ImageRGBA8 i -> PT.promoteImage i
+        P.ImageYCbCr8 i -> error$ "Sorry, NES.ImageLoader cannot use image in YCbCr8 format."
+    width = P.imageWidth img
+    height = P.imageHeight img
+    in [[P.pixelAt img x y | x <- [0..width-1]] | y <- [0..height-1]]
+
+bytestring_to_pixels :: B.ByteString -> [[P.PixelRGBA8]]
+bytestring_to_pixels = image_to_pixels . unLeft . P.decodeImage
+
+file_to_pixels :: String -> IO [[P.PixelRGBA8]]
+file_to_pixels = fmap (image_to_pixels . unLeft) . P.readImage
