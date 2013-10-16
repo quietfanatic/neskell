@@ -168,7 +168,7 @@ initialize_end' = do
 initialize_custom_clear' clear = sect "NES.initialize" (initialize_begin' >> clear >> initialize_end')
 initialize' = initialize_custom_clear' clear_memory'
 
-read_input_to' :: (Integral a, Bounded a) => a -> ASM6502 (Section6502 ())
+read_input_to' :: Integral a => a -> ASM6502 (Section6502 ())
 read_input_to' spot = sect "NES.read_input_to" $ do
      -- Freeze controllers for polling
     0x01 ->* NES.controller1
