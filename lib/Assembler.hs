@@ -58,43 +58,40 @@ assemble prev (Assembler f) = let
 
  -- An assembler that does nothing, more useful than you'd think.
 nothing :: (Monoid mon, Num ctr) => Assembler mon ctr ()
-nothing = Assembler f where f (ann, pos) = (ann, pos, mempty, ())
+nothing = Assembler $ \(ann, pos) -> (ann, pos, mempty, ())
 
  -- Returns the current counter.  Use this to declare labels.
 here :: Monoid mon => Assembler mon ctr ctr
-here = Assembler f where f (ann, pos) = (ann, pos, mempty, pos)
+here = Assembler $ \(ann, pos) -> (ann, pos, mempty, pos)
 
  -- One of whatever mon is.
 unit_assembler :: Num ctr => mon -> Assembler mon ctr ()
-unit_assembler x = Assembler f where f (ann, pos) = (ann, pos + 1, x, ())
+unit_assembler x = Assembler $ \(ann, pos) -> (ann, pos + 1, x, ())
 
 return_assembler :: Monoid mon => a -> Assembler mon ctr a
-return_assembler x = Assembler f where f (ann, pos) = (ann, pos, mempty, x)
+return_assembler x = Assembler $ \(ann, pos) -> (ann, pos, mempty, x)
 
 fail_assembler :: Integral ctr => String -> Assembler mon ctr a
-fail_assembler mess = Assembler f where
-    f (ann, pos) = let
-        err = error$ printf "%s%s at 0x%x" mess (appendable_section_name ann) (toInteger pos)
-        in (ann, pos, err, err)
+fail_assembler mess = Assembler $ \(ann, pos) -> let
+    err = error$ printf "%s%s at 0x%x" mess (appendable_section_name ann) (toInteger pos)
+    in (ann, pos, err, err)
 
  -- This is for being as lazy as possible
 fail_assembler_if :: (Monoid mon, Integral ctr) => Bool -> String -> Assembler mon ctr ()
-fail_assembler_if cond mess = Assembler f where
-    f (ann, pos) = let
-        err = error$ printf "%s%s at 0x%x" mess (appendable_section_name ann) (toInteger pos)
-        in (ann, pos, if cond then err else mempty, ())
+fail_assembler_if cond mess = Assembler $ \(ann, pos) -> let
+    err = error$ printf "%s%s at 0x%x" mess (appendable_section_name ann) (toInteger pos)
+    in (ann, pos, if cond then err else mempty, ())
 
  -- If you need to put the fail message somewhere else
 generate_fail_message :: (Monoid mon, Integral ctr) => String -> Assembler mon ctr String
-generate_fail_message mess = Assembler f where
-    f (ann, pos) = let
-        message = printf "%s%s at 0x%x" mess (appendable_section_name ann) (toInteger pos)
-        in (ann, pos, mempty, message)
+generate_fail_message mess = Assembler $ \(ann, pos) -> let
+    message = printf "%s%s at 0x%x" mess (appendable_section_name ann) (toInteger pos)
+    in (ann, pos, mempty, message)
 
  -- (>>)
 append_assembler :: Monoid mon => Assembler mon ctr a -> Assembler mon ctr b -> Assembler mon ctr b
-append_assembler (Assembler left) (Assembler right) = Assembler f where
-    f (ann1, pos) = let
+append_assembler (Assembler left) (Assembler right) =
+    Assembler $ \(ann1, pos) -> let
         (ann2, le, lp, lr) = left (ann1, pos)
         (ann3, re, rp, rr) = right (ann2, le)
         in (ann3, re, lp <> rp, rr)
@@ -109,35 +106,32 @@ bind_assembler (Assembler left) rightf = Assembler f where
 
  -- mfix
 fix_assembler :: (a -> Assembler mon ctr a) -> Assembler mon ctr a
-fix_assembler f = Assembler g where
-    g (ann1, pos) = let
-        (ann2, end, pay, ret) = assembler_function (f ret) (ann1, pos)
-        in (ann2, end, pay, ret)
+fix_assembler f = Assembler $ \(ann1, pos) -> let
+    (ann2, end, pay, ret) = assembler_function (f ret) (ann1, pos)
+    in (ann2, end, pay, ret)
 
  -- Force an section to be a certain size by padding it up.  This can break infinite dependency loops.
 pad_assembler :: (Monoid mon, Integral ctr) => ctr -> mon -> Assembler mon ctr a -> Assembler mon ctr a
-pad_assembler size filling (Assembler inner) = Assembler f where
-    f (ann1, pos) = let
-        (ann2, ie, ip, ir) = inner (ann1, pos)
-        payload = if ie > pos + size
-            then error$ printf "Code given to pad_assembler was larger than the alloted size%s (0x%x - 0x%x > 0x%x)"
-                               (appendable_section_name ann2) (toInteger ie) (toInteger pos) (toInteger size)
-            else ip <> F.fold (replicate (fromIntegral (pos + size - ie)) filling)
-        in (ann2, pos + size, payload, ir)
+pad_assembler size filling (Assembler inner) = Assembler $ \(ann1, pos) -> let
+    (ann2, ie, ip, ir) = inner (ann1, pos)
+    payload = if ie > pos + size
+        then error$ printf "Code given to pad_assembler was larger than the alloted size%s (0x%x - 0x%x > 0x%x)"
+                           (appendable_section_name ann2) (toInteger ie) (toInteger pos) (toInteger size)
+        else ip <> F.fold (replicate (fromIntegral (pos + size - ie)) filling)
+    in (ann2, pos + size, payload, ir)
 
  -- Make sure the counter is at a certain spot.  Used in, for instance, provide
 enforce_counter :: (Monoid mon, Integral ctr) => ctr -> String -> Assembler mon ctr ()
-enforce_counter expected name = Assembler f where
-    f (ann, got) = let
-        errmess = if null name
-            then printf "enforce_counter encountered an incorrect counter (0x%x /= 0x%x)%s"
-                        (toInteger got) (toInteger expected) (appendable_section_name ann)
-            else printf "%s is in the wrong place (0x%x /= 0x%x)%s"
-                        name (toInteger got) (toInteger expected) (appendable_section_name ann)
-        payload = if got == expected
-            then mempty
-            else error errmess
-        in (ann, expected, payload, ())
+enforce_counter expected name = Assembler $ \(ann, got) -> let
+    errmess = if null name
+        then printf "enforce_counter encountered an incorrect counter (0x%x /= 0x%x)%s"
+                    (toInteger got) (toInteger expected) (appendable_section_name ann)
+        else printf "%s is in the wrong place (0x%x /= 0x%x)%s"
+                    name (toInteger got) (toInteger expected) (appendable_section_name ann)
+    payload = if got == expected
+        then mempty
+        else error errmess
+    in (ann, expected, payload, ())
 
 enforce_size :: (Monoid mon, Integral ctr) => ctr -> Assembler mon ctr a -> Assembler mon ctr a
 enforce_size size body = do
@@ -172,8 +166,7 @@ annotations_get = f' undefined where
 
  -- Get all the annotations at once.  You probably don't need to do this.
 get_all_annotations :: Monoid mon => Assembler mon ctr Annotations
-get_all_annotations = Assembler f where
-    f (ann, pos) = (ann, pos, mempty, ann)
+get_all_annotations = Assembler $ \(ann, pos) -> (ann, pos, mempty, ann)
 
  -- Set an annotation to be a value.
 set_annotation :: (Typeable a, Monoid mon) => a -> Assembler mon ctr ()
@@ -182,16 +175,15 @@ set_annotation x = set_annotation_maybe (Just x)
  -- Clear an annotation.  This takes the type from its argument and ignores the value,
  --  so you can pass it undefined or whatever.
 clear_annotation :: (Typeable a, Monoid mon) => a -> Assembler mon ctr ()
-clear_annotation x = Assembler f where
-    f (ann, pos) = (M.delete (typeOf x) ann, pos, mempty, ())
+clear_annotation x = Assembler $ \(ann, pos) -> (M.delete (typeOf x) ann, pos, mempty, ())
 
  -- Set or clear an annotation based on the argument's Justice
 set_annotation_maybe :: (Typeable a, Monoid mon) => Maybe a -> Assembler mon ctr ()
-set_annotation_maybe x = Assembler f where
-    ann2 ann = case x of
+set_annotation_maybe x = Assembler $ \(ann, pos) -> let
+    ann2 = case x of
         Just v -> M.insert (typeOf v) (unsafeCoerce v) ann
         Nothing -> M.delete (typeOf (fromJust x)) ann
-    f (ann, pos) = (ann2 ann, pos, mempty, ())
+    in (ann2, pos, mempty, ())
 
  -- Get an annotation, or error if there's no annotation of that type
 get_annotation :: (Typeable a, Monoid mon, Integral ctr) => Assembler mon ctr a
@@ -199,26 +191,25 @@ get_annotation = get_annotation_typed undefined
 
  -- In case it's more convenient to manually specify the type of the annotation
 get_annotation_typed :: (Typeable a, Monoid mon, Integral ctr) => a -> Assembler mon ctr a
-get_annotation_typed _ = Assembler f where
-    f (ann, pos) = let
-        ret = case annotations_get ann of
-            Just x -> x
-            Nothing -> error$ printf "Tried to get non-existent annotation of type %s%s at 0x%x"
-                                     (appendable_section_name ann) (show (typeOf ret)) (toInteger pos)
-        in (ann, pos, mempty, ret)
+get_annotation_typed _ = Assembler $ \(ann, pos) -> let
+    ret = case annotations_get ann of
+        Just x -> x
+        Nothing -> error$ printf "Tried to get non-existent annotation of type %s%s at 0x%x"
+                                 (appendable_section_name ann) (show (typeOf ret)) (toInteger pos)
+    in (ann, pos, mempty, ret)
 
  -- Get Just an annotation or Nothing if there is none
 get_annotation_maybe :: (Typeable a, Monoid mon) => Assembler mon ctr (Maybe a)
 get_annotation_maybe = get_annotation_maybe_typed undefined
 
 get_annotation_maybe_typed :: (Typeable a, Monoid mon) => a -> Assembler mon ctr (Maybe a)
-get_annotation_maybe_typed _ = Assembler f where
-    f (ann, pos) = (ann, pos, mempty, annotations_get ann)
+get_annotation_maybe_typed _ =
+    Assembler $ \(ann, pos) -> (ann, pos, mempty, annotations_get ann)
 
  -- Get an annotation or a default value if it hasn't been set
 get_annotation_default :: (Typeable a, Monoid mon) => a -> Assembler mon ctr a
-get_annotation_default def = Assembler f where
-    f (ann, pos) = (ann, pos, mempty, fromMaybe def (annotations_get ann))
+get_annotation_default def =
+    Assembler $ \(ann, pos) -> (ann, pos, mempty, fromMaybe def (annotations_get ann))
 
  -- Modify an annotation in place.  If none exists, does nothing.
 modify_annotation :: (Typeable a, Monoid mon, Integral ctr) => (a -> a) -> Assembler mon ctr ()
