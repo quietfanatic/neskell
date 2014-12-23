@@ -1,5 +1,5 @@
 
-{-# LANGUAGE DeriveDataTypeable, RecursiveDo #-}
+{-# LANGUAGE DeriveDataTypeable, RecursiveDo, EmptyDataDecls #-}
 
 module Assembler (
     Assemblage, assemblage_annotations, assemblage_start, assemblage_end, assemblage_result,
