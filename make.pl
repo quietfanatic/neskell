@@ -1,7 +1,6 @@
 #!/usr/bin/perl
 use lib do {__FILE__ =~ /^(.*)[\/\\]/; ($1||'.').'/tool'};
 use MakePl;
-use Cwd 'realpath';
 
 my $here;
 my @modules;
@@ -12,6 +11,13 @@ sub module {
         run "runghc -ilib -i'$name' '$name/$name.hs' > '$name/$name.nes'";
     };
     push @modules, "$name/$name.nes";
+}
+ # Compile modules for future efficiency
+for (glob "*/*.hs */*/*.hs") {
+    $_ =~ /^(.*)\.hs$/;
+    rule "$1.o", "$1.hs", sub {
+        run "ghc -ilib $_[1][0]"
+    };
 }
 
  # Provide subdeps in the files themselves
@@ -24,10 +30,10 @@ subdep sub {
     for my $f (@imports) {
         $f =~ s/\./\//g;
         if (exists_or_target "$base$f.hs") {
-            push @deps, "$base$f.hs";
+            push @deps, "$base$f.o";
         }
         elsif (exists_or_target "lib/$f.hs") {
-            push @deps, "lib/$f.hs";
+            push @deps, "lib/$f.o";
         }
     }
     return @deps;

@@ -3,7 +3,7 @@
 
 MakePl - Portable drop-in build system
 https://github.com/quietfanatic/make-pl
-2013-09-27
+2013-10-05
 
 USAGE: See the README in the above repo.
 
@@ -40,17 +40,27 @@ package MakePl;
 use v5.10;
 use strict qw(subs vars);
 use warnings; no warnings 'once';
+use utf8;
+binmode STDOUT, ':utf8';
+binmode STDERR, ':utf8';
 use Carp 'croak';
-use Cwd 'realpath';
 use subs qw(cwd chdir);
-use File::Spec::Functions qw(catfile catpath splitpath abs2rel);
 
-our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir targets exists_or_target run slurp splat which);
+our @EXPORT = qw(
+    make rule phony subdep defaults include config option
+    targets exists_or_target
+    slurp splat slurp_utf8 splat_utf8
+    run which
+    cwd chdir canonpath abs2rel rel2abs
+);
+
+$ENV{PWD} //= do { require Cwd; Cwd::cwd() };
 
 # GLOBALS
+    my $original_base = cwd;  # Set once only.
     our $this_is_root = 1;  # This is set to 0 when recursing.
     our $current_file;  # Which make.pl we're processing
-    my $this_file = realpath(__FILE__);
+    my $this_file = rel2abs(__FILE__);
     my $make_was_called = 0;
 # RULES AND STUFF
     my @rules;  # All registered rules
@@ -61,8 +71,6 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     my %autoed_subdeps;  # Minimize calls to the above
     my $defaults;  # undef or array ref
 # SYSTEM INTERACTION
-    my $cwd = defined $ENV{PWD} ? realpath($ENV{PWD}) : Cwd::cwd();
-    my $original_base = cwd;  # Set once only.
     my %modtimes;  # Cache of file modification times
 # CONFIGURATION
     my %configs;  # Set of registered config names, for cosmetic purposes only
@@ -72,15 +80,17 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     my $force = 0; # Flags set from options
     my $verbose = 0;
     my $simulate = 0;
+    my $touch = 0;
+    my $jobs = 1;
 
 # START, INCLUDE, END
 
     sub import {
         my $self = shift;
         my ($package, $file, $line) = caller;
-        $current_file = realpath($file);
+        $current_file = rel2abs($file);
          # Export symbols
-        my @args = (@_ == 0 or grep $_ =! /:all/i, @_)
+        my @args = (@_ == 0 or grep $_ eq ':all' || $_ eq ':ALL', @_)
             ? @EXPORT
             : @_;
         for my $f (@args) {
@@ -88,30 +98,31 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             *{$package.'::'.$f} = \&{$f};
         }
          # Change to directory of the calling file
-        chdir catpath((splitpath realpath $file)[0,1], '');
+        $current_file =~ /^(.*)[\/\\]/ or die "path returned by rel2abs wasn't abs. ($current_file)";
+        chdir $1;
          # Also import strict and warnings.
         strict->import();
         warnings->import();
     }
 
      # Prevent double-inclusion; can't use %INC because it does relative paths.
-    my %included = (realpath($0) => 1);
+    my %included = (rel2abs($0) => 1);
     sub include {
         for (@_) {
-            my $file = $_;
+            my $file = canonpath($_);
              # Error on specific files, but skip directories.
             -e $file or croak "Cannot include $file because it doesn't exist";
             if (-d $file) {
-                my $makepl = catfile($file, 'make.pl');
+                my $makepl = "$file/make.pl";
                 next unless -e $makepl;
                 $file = $makepl;
             }
-            my $real = realpath($file);
+            my $real = rel2abs($file);
              # Just like a C include, a subdep is warranted.
             push @{$subdeps{$real}}, { base => MakePl::cwd, to => [$real], from => [$current_file] };
              # Skip already-included files
             next if $included{$real};
-            $included{real} = 1;
+            $included{$real} = 1;
              # Make new project.
             local $this_is_root = 0;
             local $current_file;
@@ -120,8 +131,8 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
                 my $old_cwd = MakePl::cwd;
                 do $file;  # This file will do its own chdir
                 MakePl::chdir $old_cwd;
-                $@ and die status $@;
             };
+            $@ and die status($@);
             if (!$make_was_called) {
                 die "\e[31m✗\e[0m $file did not end with 'make;'\n";
             }
@@ -143,6 +154,20 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     sub status {
         say directory_prefix(), @_;
         return "\n";  # Marker to hand to die
+    }
+
+    sub do_rule {
+        my ($rule) = @_;
+        if (!$simulate and defined $rule->{recipe}) {
+            if ($touch) {
+                for (@{$rule->{to}}) {
+                    utime(undef, undef, $_);
+                }
+            }
+            else {
+                $rule->{recipe}->($rule->{to}, $rule->{from});
+            }
+        }
     }
 
     sub make () {
@@ -196,7 +221,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             my $plan = init_plan();
             eval {
                 if (@args) {
-                    grep plan_target($plan, realpath($_)), @args;
+                    grep plan_target($plan, rel2abs($_, $original_base)), @args;
                 }
                 elsif ($defaults) {
                     grep plan_target($plan, $_), @$defaults;
@@ -220,21 +245,107 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             }
             else {
                 eval {
-                    for my $rule (@program) {
-                        chdir $rule->{base};
-                        status $rule->{config} ? "⚒ " : "⚙ ", show_rule($rule);
-                        delazify($rule);
-                        $rule->{recipe}->($rule->{to}, $rule->{from})
-                            unless $simulate or not defined $rule->{recipe};
+                    if ($jobs > 1) {
+                        my %jobs;
+                        $SIG{INT} = sub {
+                            kill 2, $_ for keys %jobs;
+                            die "interrupted\n";
+                        };
+                        $SIG{__DIE__} = sub {
+                            kill 2, $_ for keys %jobs;
+                            die $_[0];
+                        };
+                        my $do_wait;
+                        $do_wait = sub {
+                            keys(%jobs) > 0 or do {
+                                die "Tried to wait on no jobs -- internal planner error?\n", join "\n", map show_rule($_), @program;
+                            };
+                            my $child = wait;
+                            if ($child == -1) {
+                                die "Unexpectedly lost children!\n";
+                            }
+                            if ($?) {
+                                print readline($jobs{$child}{output});
+                                close $jobs{$child}{output};
+                                delete $jobs{$child};
+                                 # Wait for more children
+                                $do_wait->() if %jobs;
+                                die "\n";
+                            }
+                            $jobs{$child}{done} = 1;
+                            print readline($jobs{$child}{output});
+                            close $jobs{$child}{output};
+                            delete $jobs{$child};
+                        };
+                        while (@program || %jobs) {
+                            $do_wait->() if keys(%jobs) >= $jobs;
+                            my $rule;
+                            for (0..$#program) {
+                                next unless $program[$_]{options}{fork};
+                                 # Don't run program if its deps haven't been finished
+                                next if grep !$_->{done}, @{$program[$_]{follow}};
+                                $rule = splice @program, $_, 1;
+                                last;
+                            }
+                            if (defined $rule) {
+                                chdir $rule->{base};
+                                status $rule->{config} ? "⚒ " : "⚙ ", show_rule($rule);
+                                delazify($rule);
+                                pipe($rule->{output}, my $OUTPUT) or die "pipe failed: $!\n";
+                                binmode $rule->{output}, ':utf8';
+                                binmode $OUTPUT, ':utf8';
+                                if (my $child = fork // die "Failed to fork: $!\n") {
+                                     # parent
+                                    $jobs{$child} = $rule;
+                                }
+                                else {  # child
+                                     # Don't fall out of the eval {} out there
+                                    $SIG{__DIE__} = sub { warn @_; exit 1; };
+                                    close STDOUT;
+                                    open STDOUT, '>&', $OUTPUT or die "Could not reopen STDOUT: $!\n";
+                                    close STDERR;
+                                    open STDERR, '>&', $OUTPUT or die "Could not reopen STDERR: $!\n";
+                                    do_rule($rule);
+                                    exit 0;
+                                }
+                                close $OUTPUT;
+                            }
+                            elsif (%jobs) {
+                                $do_wait->();
+                            }
+                            else {  # Do a non-parallel job
+                                my $rule = shift @program;
+                                chdir $rule->{base};
+                                status $rule->{config} ? "⚒ " : "⚙ ", show_rule($rule);
+                                delazify($rule);
+                                do_rule($rule);
+                                $rule->{done} = 1;
+                            }
+                        }
+                    }
+                    else {
+                        for my $rule (@program) {
+                            chdir $rule->{base};
+                            status $rule->{config} ? "⚒ " : "⚙ ", show_rule($rule);
+                            delazify($rule);
+                            do_rule($rule);
+                        }
                     }
                 };
-                if ($@) {
+                if ("$@" eq "interrupted\n") {
+                    say "\e[31m✗\e[0m Interrupted.";
+                    exit 1;
+                }
+                elsif ($@) {
                     warn $@ unless "$@" eq "\n";
                     say "\e[31m✗\e[0m Did not finish due to error.";
                     exit 1;
                 }
                 if ($simulate) {
                     say "\e[32m✓\e[0m Simulation finished.";
+                }
+                elsif ($touch) {
+                    say "\e[32m✓\e[0m File modtimes updated.";
                 }
                 else {
                     say "\e[32m✓\e[0m Done.";
@@ -256,36 +367,41 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
 # RULES AND DEPENDENCIES
 
     sub create_rule {
-        my ($to, $from, $recipe, $package, $file, $line) = @_;
+        my ($to, $from, $recipe, $options, $package, $file, $line) = @_;
         ref $recipe eq 'CODE' or !defined $recipe or croak "Non-code recipe given to rule";
         my $rule = {
-            caller_file => realpath($file),
+            caller_file => $current_file,
             caller_line => $line,
             base => cwd,
             to => [arrayify($to)],
             from => lazify($from),
             deps => undef,  # Generated from from
             recipe => $recipe,
+            options => $options,
             check_stale => undef,
             config => 0,
-            planned => 0,  # Intrusive state for the planning phase
+             # Intrusive state for planning and execution phases
+            planned => 0,
+            follow => [],
+            done => 0,
+            output => undef,
         };
         push @rules, $rule;
         for (@{$rule->{to}}) {
-            push @{$targets{realpath($_)}}, $rule;
+            push @{$targets{rel2abs($_)}}, $rule;
         }
     }
 
-    sub rule ($$$) {
-        create_rule(@_, caller);
+    sub rule ($$$;$) {
+        create_rule($_[0], $_[1], $_[2], $_[3] // {}, caller);
     }
 
-    sub phony ($;$$) {
-        my ($to, $from, $recipe) = @_;
+    sub phony ($;$$$) {
+        my ($to, $from, $recipe, $options) = @_;
         for (arrayify($to)) {
-            $phonies{realpath($_)} = 1;
+            $phonies{rel2abs($_)} = 1;
         }
-        create_rule($to, $from, $recipe, caller) if defined $from;
+        create_rule($to, $from, $recipe, $options // {}, caller) if defined $from;
     }
 
     sub subdep ($;$) {
@@ -303,7 +419,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
                 from => lazify($from),
             };
             for (@{$subdep->{to}}) {
-                push @{$subdeps{realpath($_)}}, $subdep;
+                push @{$subdeps{rel2abs($_)}}, $subdep;
             }
         }
         else {
@@ -312,7 +428,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     }
 
     sub defaults {
-        push @$defaults, map realpath($_), @_;
+        push @$defaults, map rel2abs($_), @_;
     }
 
     sub targets {
@@ -320,7 +436,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     }
 
     sub exists_or_target {
-        return -e $_[0] or exists $targets{realpath($_[0])};
+        return (-e $_[0] or exists $targets{rel2abs($_[0])});
     }
 
     sub arrayify {
@@ -344,7 +460,11 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             @{$autoed_subdeps{$target} //= [
                 map {
                     chdir $_->{base};
-                    realpaths($_->{code}($target));
+                    my @got = $_->{code}($target);
+                    if (grep !defined, @got) {
+                        warn "Warning: function that generated auto subdeps for $target returned an undefined value\n";
+                    }
+                    realpaths(grep defined, @got);
                 } @auto_subdeps
             ]}
         } @_;
@@ -366,6 +486,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
         my @deps = (realpaths(@{$rule->{from}}), $rule->{caller_file}, $this_file);
          # Using this style of loop because @deps will keep expanding.
         for (my $i = 0; $i < @deps; $i++) {
+            defined $deps[$i] or die "Undef dependency given to rule at $rule->{caller_file} line $rule->{caller_line}\n";
             push_new(\@deps, get_auto_subdeps($deps[$i]));
             for my $subdep (@{$subdeps{$deps[$i]}}) {
                 chdir $subdep->{base};
@@ -383,7 +504,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             return "@{$_[0]{to}} ← " . join ' ', map abs2rel($_), @{$_[0]{deps}};
         }
         else {
-            my @froms = grep !$configs{realpath($_)}, @{$_[0]{from}};
+            my @froms = grep !$configs{rel2abs($_)}, @{$_[0]{from}};
             @froms or @froms = @{$_[0]{from}};
             return "@{$_[0]{to}} ← " . join ' ', @froms;
         }
@@ -400,15 +521,11 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
         else {
             my $rule = $rules[0];
             defined $rule or return 0;
-            my $old_cwd = cwd;
-            chdir $rule->{base};
             for (@{$rule->{to}}) {
-                if (realpath($_) eq $_[0]) {
-                    chdir $old_cwd;
+                if (rel2abs($_, $rule->{base}) eq $_[0]) {
                     return 1;
                 }
             }
-            chdir $old_cwd;
             return 0;
         }
     }
@@ -509,18 +626,22 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             deps => undef,
             check_stale => sub { stale_config($filename, $var); },
             recipe => sub { gen_config($filename, $var, $routine); },
-            caller_file => realpath($file),
+            caller_file => $current_file,
             caller_line => $line,
             config => 1,
-            planned => 0,
+            options => {},
             stale => 0,
+             # Intrusive state for planning and execution phases
+            planned => 0,
+            follow => [],
+            executed => 0,
         };
         push @rules, $rule;
-        push @{$targets{realpath($filename)}}, $rule;
-        $configs{realpath($filename)} = 1;
+        push @{$targets{rel2abs($filename)}}, $rule;
+        $configs{rel2abs($filename)} = 1;
          # Read into $var immediately
         if (-e $filename) {
-            my $str = slurp($filename);
+            my $str = slurp_utf8($filename);
             chomp $str;
             my $val = read_config($filename, $str);
             if (ref $var eq 'SCALAR') {
@@ -540,7 +661,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     sub stale_config ($$) {
         my ($filename, $var) = @_;
         return 1 unless -e $filename;
-        my $old = slurp($filename);
+        my $old = slurp_utf8($filename);
         chomp $old;
         my $new = show_thing(ref $var eq 'SCALAR' ? $$var : $var);
         return $new ne $old;
@@ -550,7 +671,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
         my ($filename, $var, $routine) = @_;
         $routine->() if defined $routine;
         my $new = show_thing(ref $var eq 'SCALAR' ? $$var : $var);
-        splat($filename, "$new\n");
+        splat_utf8($filename, "$new\n");
     }
 
     sub option ($$;$) {
@@ -597,10 +718,49 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     %builtin_options = (
         help => {
             ref => sub {
-                my %nonfinal_targets;
-                for (@rules) {
-                    resolve_deps($_);
-                    $nonfinal_targets{$_} = 1 for @{$_->{deps}};
+                my (%nonfinal, %suggested, %nonsuggested, %default);
+                for my $rule (@rules) {
+                    resolve_deps($rule);
+                    $nonfinal{$_} = 1 for @{$rule->{deps}};
+                    if (defined $rule->{options}{suggested}) {
+                        for (@{$rule->{to}}) {
+                            if ($rule->{options}{suggested}) {
+                                $suggested{rel2abs($_, $rule->{base})} = 1;
+                            }
+                            else {
+                                $nonsuggested{rel2abs($_, $rule->{base})} = 1;
+                            }
+                        }
+                    }
+                }
+                if (defined $defaults) {
+                    for (@$defaults) {
+                        $default{$_} = 1;
+                    }
+                }
+                elsif (@rules) {
+                    for (@{$rules[0]{to}}) {
+                        $default{rel2abs($_, $rules[0]{base})} = 1;
+                    }
+                }
+                 # Gradually narrow down criteria for suggestion
+                my @suggested = grep {
+                    ($default{$_} or $phonies{$_} or !$nonfinal{$_}) and not $nonsuggested{$_}
+                } targets;
+                if (@suggested > 12) {
+                    @suggested = grep {
+                        $default{$_} or !$nonfinal{$_} or $suggested{$_}
+                    } @suggested;
+                    if (@suggested > 12) {
+                        @suggested = grep {
+                            $default{$_} or $phonies{$_} or $suggested{$_}
+                        } @suggested;
+                        if (@suggested > 12) {
+                            @suggested = grep {
+                                $default{$_} or $suggested{$_}
+                            } @suggested;
+                        }
+                    }
                 }
                 say "\e[31m✗\e[0m Usage: $0 <options> <targets>";
                 if (%custom_options) {
@@ -615,8 +775,8 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
                         say "    $builtin_options{$_}{desc}";
                     }
                 }
-                say "Final targets:";
-                for (sort grep !$nonfinal_targets{$_}, keys %targets) {
+                say "Suggested targets:";
+                for (sort @suggested) {
                     say "    ", abs2rel($_), target_is_default($_) ? " (default)" : "";
                 }
                 exit 1;
@@ -637,7 +797,7 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
         },
         force => {
             ref => \$force,
-            desc => '--force - Skip modification time checks',
+            desc => '--force - Skip modification time checks and always run the rules',
             custom => 0
         },
         verbose => {
@@ -650,25 +810,28 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             desc => '--simulate - Show rules that would be run but don\'t run them',
             custom => 0
         },
+        touch => {
+            ref => \$touch,
+            desc => '--touch - Update existing files\' modtimes instead of running the rules',
+            custom => 0
+        },
+        jobs => {
+            ref => \$jobs,
+            desc => '--jobs=<number> - Run this many parallel jobs if the rules support it',
+            custom => 0
+        },
     );
 
 # SYSTEM INTERACTION
 
-    sub cwd () { return $cwd; }
-    sub chdir ($) {
-        my $new = realpath($_[0]);
-        $cwd eq $new or Cwd::chdir($cwd = $new) or die "Failed to chdir to $new: $!\n";
+    sub cwd () {
+        return $ENV{PWD};
     }
-    sub rel2abs ($;$) {
-        if (defined $_[1]) {
-            my $old_cwd = cwd;
-            chdir $_[1];
-            my $r = realpath($_[0]);
-            chdir $old_cwd;
-            return $r;
-        }
-        else {
-            return realpath($_[0]);
+    sub chdir ($) {
+        my $new = rel2abs($_[0]);
+        if ($new ne cwd) {
+            CORE::chdir $new or die "Failed to chdir to $new: $!\n";
+            $ENV{PWD} = $new;
         }
     }
     sub fexists {
@@ -701,6 +864,9 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
             if ($? == -1) {
                 status("☢ Couldn't start command: $!");
             }
+            elsif (($? & 127) == 2) {
+                die "interrupted\n";
+            }
             elsif ($? & 127) {
                 status(sprintf "☢ Command died with signal %d, %s coredump",
                    ($? & 127),  ($? & 128) ? 'with' : 'without');
@@ -713,34 +879,74 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
     }
 
     sub realpaths (@) {
-        return map {
-            my $r = realpath($_);
-            unless (defined $r) {
-                my $abs = File::Spec::Functions::rel2abs($_) // $_;
-                croak "\"$abs\" doesn't seem to be a real path";
-            }
-            $r;
-        } @_;
+        return map rel2abs($_), @_;
     }
 
+    sub canonpath {
+        $_[0] eq '.' and return $_[0];
+        if (index($_[0], '\\') == -1
+        and index($_[0], '//') == -1
+        and index($_[0], '/.') == -1
+        and index($_[0], '/', length($_[0])-1) != length($_[0])-1) {
+            return $_[0];
+        }
+        my $p = $_[0];
+        $p =~ tr/\\/\//;
+        1 while $p =~ s/\/(?:\.?|(?!\.\.\/)[^\/]*\/\.\.)(?=\/|$)//;
+        return $p;
+    }
+
+    sub rel2abs {
+        my ($rel, $base) = @_;
+        $base //= cwd;
+        return canonpath(rindex($rel, '/', 0) == 0 ? $rel : "$base/$rel");
+    }
+    sub abs2rel {
+        my ($abs, $base) = @_;
+        $abs = canonpath($abs);
+        rindex($abs, '/', 0) == 0 or return $abs;
+        $base = defined($base) ? canonpath($base) : cwd;
+        if ($abs eq $base) {
+            return '.';
+        }
+        if (rindex($abs, $base . '/', 0) == 0) {
+            return substr($abs, length($base) + 1);
+        }
+        return $abs;
+    }
+
+    sub iofail { $_[0] or croak $_[1]; undef }
+
     sub slurp {
-        my ($file, $bytes) = @_;
-        open my $F, '<', $file or croak "Failed to open $file for reading: $! in call to slurp";
+        my ($file, $bytes, $fail) = @_;
+        $fail //= 1;
+        open my $F, '<', $file or return iofail $fail, "Failed to open $file for reading: $! in call to slurp";
         my $r;
         if (defined $bytes) {
-            read $F, $r, $bytes // (croak "Failed to read $file: $! in call to slurp");
+            defined read($F, $r, $bytes) or return iofail $fail, "Failed to read $file: $! in call to slurp";
         }
         else {
             local $/; $r = <$F>;
+            defined $r or return $fail, "Failed to read $file: $! in call to slurp";
         }
-        close $F or croak "Failed to close $file: $! in call to slurp";
+        close $F or return $fail, "Failed to clode $file: $! in call to slurp";
         return $r;
     }
     sub splat {
-        my ($file, $string) = @_;
-        open my $F, '>', $file or croak "Failed to open $file for writing: $! in call to splat";
-        print $F $string or croak "Failed to write to $file: $! in call to splat";
-        close $F or croak "Failed to close $file: $! in call to close";
+        my ($file, $string, $fail) = @_;
+        $fail //= 1;
+        defined $string or return iofail $fail, "Cannot splat undef to $file";
+        open my $F, '>', $file or return iofail $fail, "Failed to open $file for writing: $! in call to splat";
+        print $F $string or return iofail $fail, "Failed to write to $file: $! in call to splat";
+        close $F or return iofail $fail, "Failed to close $file: $! in call to close";
+    }
+    sub slurp_utf8 {
+        require Encode;
+        return Encode::decode_utf8(slurp(@_));
+    }
+    sub splat_utf8 {
+        require Encode;
+        splat($_[0], Encode::encode_utf8($_[1]), $_[2]);
     }
 
     sub which {
@@ -772,11 +978,11 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
          # Make sure the file exists or there's a rule for it
         unless ($targets{$target} or fexists($target)) {
             my $rel = abs2rel($target, $original_base);
-            my $mess = "☢ Cannot find or make $rel" . (@{$plan->{stack}} ? ", required by\n" : "\n");
+            my $mess = "☢ Cannot find or make $rel ($target)" . (@{$plan->{stack}} ? ", required by\n" : "\n");
             for my $rule (reverse @{$plan->{stack}}) {
                 $mess .= "\t" . debug_rule($rule) . "\n";
             }
-            die status $mess;
+            die status($mess);
         }
          # In general, there should be only rule per target, but there can be more.
         return grep plan_rule($plan, $_), @{$targets{$target}};
@@ -784,18 +990,23 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
 
     sub plan_rule {
         my ($plan, $rule) = @_;
+         # Register dependency for parallel scheduling.
+        if (@{$plan->{stack}}) {
+            push @{$plan->{stack}[-1]{follow}}, $rule;
+        }
          # detect loops
         if (not defined $rule->{planned}) {
             my $mess = "☢ Dependency loop\n";
             for my $old (reverse @{$plan->{stack}}) {
                 $mess .= "\t" . debug_rule($old) . "\n";
-                die status $mess if $rule eq $old;  # reference compare
+                die status($mess) if $rule eq $old;  # reference compare
             }
             Carp::confess $mess . "\t...oh wait, false alarm.  Which means there's a bug in make.pm.\nDetected";
         }
         elsif ($rule->{planned}) {
             return $rule->{stale};  # Already planned
         }
+         # Commit to planning
         push @{$plan->{stack}}, $rule;
         $rule->{planned} = undef;  # Mark that we're currently planning this
 
@@ -807,10 +1018,15 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
         $stale ||= $force;
         $stale ||= $rule->{check_stale}() if defined $rule->{check_stale};
         $stale ||= grep {
-            my $abs = realpath($_);
+            my $abs = rel2abs($_);
             !fexists($abs) or grep modtime($abs) < modtime($_), @{$rule->{deps}};
         } @{$rule->{to}};
-        push @{$plan->{program}}, $rule if $stale;
+        if ($stale) {
+            push @{$plan->{program}}, $rule;
+        }
+        else {
+            $rule->{done} = 1;  # Don't confuse parallel scheduler.
+        }
          # Done planning this rule
         $rule->{planned} = 1;
         $rule->{stale} = $stale;
@@ -823,37 +1039,25 @@ our @EXPORT = qw(make rule phony subdep defaults include config option cwd chdir
  # Generate a make.pl scaffold.
 if ($^S == 0) {  # We've been called directly
     $make_was_called = 1;  # Not really but supresses warning
-    if (@ARGV != 1 or $ARGV[0] eq '--help') {
+    if (@ARGV > 1 or (defined $ARGV[0] and $ARGV[0] =~ /-?-h(?:elp)?/)) {
         say "\e[31m✗\e[0m Usage: perl $0 <directory (default: .)>";
         exit 1;
     }
-    my $loc = $ARGV[0];
-    defined $loc or $loc = cwd;
-    my $dir;
-    if (-d $loc) {
-        $loc = "$loc/make.pl";
-        $dir = $loc;
-    }
-    elsif (-e $loc) {
+    my $loc = defined $ARGV[0] ? canonpath($ARGV[0]) : cwd;
+    $loc = "$loc/make.pl" if -d $loc;
+    if (-e $loc) {
         say "\e[31m✗\e[0m Did not generate $loc because it already exists.";
         exit 1;
     }
-    elsif ($loc =~ /^(.*)\/[^\/]*$/) {
-        $dir = $1;
-    }
-    else {
-        $dir = cwd;
-    }
-    my $path_to_pm = abs2rel(realpath(__FILE__), $dir);
-    $path_to_pm =~ s/\/MakePl\.pm$//;
+    my $dir = $loc =~ /^(.*)\/[^\/]*$/ ? $1 : cwd;
+    my $path_to_pm = abs2rel(rel2abs(__FILE__), $dir);
+    $path_to_pm =~ s/\/?MakePl\.pm$//;
     $path_to_pm =~ s/'/\\'/g;
-    my $pathext = $path_to_pm eq '.'
-        ? ''
-        : ".'/$path_to_pm'";
+    my $pathext = $path_to_pm eq '' ? '' : ".'/$path_to_pm'";
     local $/;
     my $out = <DATA>;
     $out =~ s/◀PATHEXT▶/$pathext/;
-    open my $MAKEPL, '>', $loc or die "Failed to open $loc for writing: $!\n";
+    open my $MAKEPL, '>:utf8', $loc or die "Failed to open $loc for writing: $!\n";
     print $MAKEPL $out or die "Failed to write to $loc: $!\n";
     chmod 0755, $MAKEPL or warn "Failed to chmod $loc: $!\n";
     close $MAKEPL or die "Failed to close $loc: $!\n";
