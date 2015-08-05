@@ -49,6 +49,11 @@ main = do
     input2 <- res 1
     input1 <- res 1
 
+    char_pos <- resz 2
+    char_vel <- resz 2
+    char_flags <- resz 1
+    let char_flag_ground = 0x01
+
      -- UTILITY VALUES
 
     let init_ball' = sect "init_ball" $ mdo
@@ -89,6 +94,34 @@ main = do
             skip (lda (yc screen) >> cmpi 0xf0 >>. bne) $ do
                 0x00 ->* (yc screen)
                 NES.nametable_y_bit -^>* save_ppuctrl
+
+    let init_char' = sect "init_char" $ mdo
+        lda 0x40
+        sta (xc char_pos)
+        sta (yc char_pos)
+
+    let move_char' = sect "move_char" $ mdo
+        let when_press bit act = do
+            lda input1
+            andi bit
+            skip beq act
+        when_press NES.btn_left $ do
+            dec (xc char_vel)
+        when_press NES.btn_right $ do
+            inc (xc char_vel)
+        when_press NES.btn_a $ do
+--            lda char_flags
+--            andi char_flag_ground
+--            skip beq $ do
+                lda 0xf8
+                sta (yc char_vel)
+        lda (yc char_vel)
+        skip (cmpi 0x08 >>. bcc) $ do
+            inc (yc char_vel)
+            lda (yc char_vel)
+        add (yc char_pos)
+        sta (yc char_pos)
+
 
      -- draw_model : Y = model size in bytes, 00:01 = pointer to model, 02 = xcoord, 03 = ycoord
     draw_model <- sect "draw_model_sub" $ do
@@ -158,6 +191,7 @@ main = do
                     .|. NES.enable_background_bit .|. NES.enable_sprites_bit
 
         init_ball'
+        init_char'
          -- Done with everything
         idle <- here
         jmp idle
@@ -186,6 +220,12 @@ main = do
         high ball_model ->* 0x01
         xc ball *->* 0x02
         yc ball *->* 0x03
+        ldyi (size ball_model)
+        jsr draw_model
+         -- Draw the character
+        move_char'
+        xc char_pos *->* 0x02
+        yc char_pos *->* 0x03
         ldyi (size ball_model)
         jsr draw_model
          -- Stow away any unused sprites
